@@ -1,4 +1,12 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 
 import { ConcertsService } from './concerts.service';
 import { FindConcertsDto } from './dto/find-concerts.dto';
@@ -14,8 +22,8 @@ export class ConcertsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    const concert = this.concertsService.findOne(id);
+  async findOne(@Param('id') id: string) {
+    const concert = await this.concertsService.findOne(id);
     if (!concert) {
       throw new NotFoundException('Concert introuvable');
     }
@@ -23,13 +31,12 @@ export class ConcertsController {
   }
 
   @Post(':id/favorite')
-  toggleFavorite(@Param('id') id: string) {
+  async toggleFavorite(@Param('id') id: string) {
     return this.concertsService.toggleFavorite(id);
   }
 
   @Post(':id/report')
-  report(@Param('id') id: string, @Body() body: ReportConcertDto) {
+  async report(@Param('id') id: string, @Body() body: ReportConcertDto) {
     return this.concertsService.report(id, body.reason);
   }
 }
-

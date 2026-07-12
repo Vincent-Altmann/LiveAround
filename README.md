@@ -40,6 +40,13 @@ flutter pub get
 flutter run
 ```
 
+Sur emulateur Android, l'API locale de la machine hote doit etre appelee avec `10.0.2.2` :
+
+```bash
+cd apps/mobile
+flutter run --dart-define LIVEAROUND_API_BASE_URL=http://10.0.2.2:3000
+```
+
 Si les dossiers natifs Android/iOS ne sont pas encore presents, lancer une seule fois :
 
 ```bash
@@ -57,6 +64,14 @@ npm install
 npm run start:dev
 ```
 
+Pour utiliser Ticketmaster, creer `apps/api/.env` a partir de `.env.example`, puis renseigner :
+
+```env
+TICKETMASTER_API_KEY=...
+TICKETMASTER_COUNTRY_CODE=FR
+TICKETMASTER_LOCALE=fr-fr,*
+```
+
 Pour lancer PostgreSQL/PostGIS localement :
 
 ```bash
@@ -71,4 +86,3 @@ Premiere base de code initialisee avec :
 - API NestJS avec endpoints concerts, favoris et signalements ;
 - configuration Docker Compose PostGIS ;
 - documentation d'architecture et de developpement.
-

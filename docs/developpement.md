@@ -51,9 +51,8 @@ PostgreSQL est expose sur `localhost:5432`.
 
 ## Prochaines integrations
 
-- Ticketmaster Discovery API ou autre source concerts.
+- Cle Ticketmaster reelle dans `apps/api/.env`.
 - Geocodage ville -> latitude/longitude.
 - Authentification utilisateur.
 - Persistance favoris et signalements.
 - Firebase Cloud Messaging.
-

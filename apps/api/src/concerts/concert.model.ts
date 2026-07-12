@@ -1,10 +1,4 @@
-export type MusicGenre =
-  | 'Rock'
-  | 'Pop'
-  | 'Electro'
-  | 'Jazz'
-  | 'Rap'
-  | 'Classique';
+export type MusicGenre = string;
 
 export interface VenueModel {
   name: string;
@@ -25,6 +19,8 @@ export interface ConcertModel {
   priceFrom: number;
   ticketUrl: string;
   description: string;
+  source?: string;
+  imageUrl?: string;
 }
 
 export interface ConcertReportModel {
@@ -32,4 +28,3 @@ export interface ConcertReportModel {
   reason: string;
   createdAt: string;
 }
-

@@ -1,14 +1,102 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { ConcertModel, ConcertReportModel } from './concert.model';
 import { FindConcertsDto } from './dto/find-concerts.dto';
+import { TicketmasterClient } from './ticketmaster.client';
 
 @Injectable()
 export class ConcertsService {
+  private readonly logger = new Logger(ConcertsService.name);
   private readonly favorites = new Set<string>();
   private readonly reports: ConcertReportModel[] = [];
+  private readonly cache = new Map<string, ConcertModel>();
 
-  findNearby(query: FindConcertsDto) {
+  constructor(private readonly ticketmasterClient: TicketmasterClient) {}
+
+  async findNearby(query: FindConcertsDto) {
+    if (this.ticketmasterClient.isEnabled()) {
+      try {
+        const concerts = await this.ticketmasterClient.searchEvents(query);
+        concerts.forEach((concert) => this.cache.set(concert.id, concert));
+        return withFavorites(concerts, this.favorites);
+      } catch (error) {
+        this.logger.warn(
+          `Ticketmaster indisponible, fallback mock active: ${errorMessage(error)}`,
+        );
+      }
+    }
+
+    return withFavorites(this.findSeedNearby(query), this.favorites);
+  }
+
+  async findOne(id: string) {
+    const cached = this.cache.get(id);
+    if (cached) {
+      return {
+        ...cached,
+        isFavorite: this.favorites.has(id),
+      };
+    }
+
+    if (this.ticketmasterClient.isEnabled() && !id.startsWith('la-')) {
+      try {
+        const concert = await this.ticketmasterClient.getEvent(id);
+        if (concert) {
+          this.cache.set(concert.id, concert);
+          return {
+            ...concert,
+            isFavorite: this.favorites.has(id),
+          };
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Detail Ticketmaster indisponible pour ${id}: ${errorMessage(error)}`,
+        );
+      }
+    }
+
+    const concert = seedConcerts.find((item) => item.id === id);
+    if (!concert) return null;
+    return {
+      ...concert,
+      isFavorite: this.favorites.has(id),
+    };
+  }
+
+  async toggleFavorite(id: string) {
+    const concert = await this.findOne(id);
+    if (!concert) {
+      throw new NotFoundException('Concert introuvable');
+    }
+
+    if (this.favorites.has(id)) {
+      this.favorites.delete(id);
+    } else {
+      this.favorites.add(id);
+    }
+
+    return {
+      concertId: id,
+      isFavorite: this.favorites.has(id),
+    };
+  }
+
+  async report(concertId: string, reason: string) {
+    const concert = await this.findOne(concertId);
+    if (!concert) {
+      throw new NotFoundException('Concert introuvable');
+    }
+
+    const report = {
+      concertId,
+      reason,
+      createdAt: new Date().toISOString(),
+    };
+    this.reports.push(report);
+    return report;
+  }
+
+  private findSeedNearby(query: FindConcertsDto) {
     const normalizedQuery = query.query?.trim().toLowerCase();
     const from = query.from ? new Date(query.from) : null;
     const to = query.to ? new Date(query.to) : null;
@@ -45,48 +133,17 @@ export class ConcertsService {
       })
       .sort((a, b) => a.distanceKm - b.distanceKm);
   }
+}
 
-  findOne(id: string) {
-    const concert = seedConcerts.find((item) => item.id === id);
-    if (!concert) return null;
-    return {
-      ...concert,
-      isFavorite: this.favorites.has(id),
-    };
-  }
+function withFavorites(concerts: ConcertModel[], favorites: Set<string>) {
+  return concerts.map((concert) => ({
+    ...concert,
+    isFavorite: favorites.has(concert.id),
+  }));
+}
 
-  toggleFavorite(id: string) {
-    const concert = this.findOne(id);
-    if (!concert) {
-      throw new NotFoundException('Concert introuvable');
-    }
-
-    if (this.favorites.has(id)) {
-      this.favorites.delete(id);
-    } else {
-      this.favorites.add(id);
-    }
-
-    return {
-      concertId: id,
-      isFavorite: this.favorites.has(id),
-    };
-  }
-
-  report(concertId: string, reason: string) {
-    const concert = this.findOne(concertId);
-    if (!concert) {
-      throw new NotFoundException('Concert introuvable');
-    }
-
-    const report = {
-      concertId,
-      reason,
-      createdAt: new Date().toISOString(),
-    };
-    this.reports.push(report);
-    return report;
-  }
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function distanceKm(
@@ -219,4 +276,3 @@ const seedConcerts: ConcertModel[] = [
     description: 'Programme accessible autour de cordes et pieces orchestrales.',
   },
 ];
-

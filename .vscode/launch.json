@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "LiveAround Mobile (Android Emulator)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "apps/mobile",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define",
+        "LIVEAROUND_API_BASE_URL=http://10.0.2.2:3000"
+      ]
+    },
+    {
+      "name": "LiveAround Mobile (Desktop/Web local API)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "apps/mobile",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define",
+        "LIVEAROUND_API_BASE_URL=http://localhost:3000"
+      ]
+    }
+  ]
+}
+
