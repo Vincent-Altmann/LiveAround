@@ -15,9 +15,6 @@ class ApiConcertRepository implements ConcertRepository {
         _fallbackRepository = fallbackRepository,
         _client = client ?? http.Client();
 
-  static const _lyonLatitude = 45.764;
-  static const _lyonLongitude = 4.8357;
-
   final Uri _baseUri;
   final ConcertRepository _fallbackRepository;
   final http.Client _client;
@@ -26,8 +23,8 @@ class ApiConcertRepository implements ConcertRepository {
   Future<List<Concert>> findNearby(ConcertFilters filters) async {
     try {
       final uri = _buildUri('/concerts', {
-        'latitude': _lyonLatitude.toString(),
-        'longitude': _lyonLongitude.toString(),
+        'latitude': filters.latitude.toString(),
+        'longitude': filters.longitude.toString(),
         'radiusKm': filters.radiusKm.round().toString(),
         if (filters.query.trim().isNotEmpty) 'query': filters.query.trim(),
         if (filters.selectedGenres.isNotEmpty)

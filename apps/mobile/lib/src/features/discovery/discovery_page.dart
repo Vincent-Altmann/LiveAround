@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../../data/concert_repository.dart';
+import '../../data/user_location_service.dart';
 import '../../domain/concert.dart';
 import '../../domain/concert_filters.dart';
+import '../../domain/user_location.dart';
 import '../../theme/livearound_theme.dart';
 import '../concert/concert_detail_page.dart';
 import '../map/concert_map.dart';
 
 class DiscoveryPage extends StatefulWidget {
-  const DiscoveryPage({required this.repository, super.key});
+  const DiscoveryPage({
+    required this.repository,
+    required this.locationLoader,
+    super.key,
+  });
 
   final ConcertRepository repository;
+  final UserLocationLoader locationLoader;
 
   @override
   State<DiscoveryPage> createState() => _DiscoveryPageState();
@@ -19,6 +26,7 @@ class DiscoveryPage extends StatefulWidget {
 class _DiscoveryPageState extends State<DiscoveryPage> {
   ConcertFilters _filters = const ConcertFilters();
   late Future<List<Concert>> _concertsFuture;
+  var _isResolvingLocation = false;
 
   static const List<String> _genres = [
     'Rock',
@@ -33,6 +41,7 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
   void initState() {
     super.initState();
     _concertsFuture = widget.repository.findNearby(_filters);
+    _resolveLocation();
   }
 
   void _refresh() {
@@ -44,6 +53,26 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
   void _updateFilters(ConcertFilters filters) {
     _filters = filters;
     _refresh();
+  }
+
+  Future<void> _resolveLocation() async {
+    setState(() {
+      _isResolvingLocation = true;
+    });
+
+    final location = await widget.locationLoader();
+    if (!mounted) return;
+
+    _filters = _filters.copyWith(
+      latitude: location.latitude,
+      longitude: location.longitude,
+      locationLabel: location.label,
+      usesFallbackLocation: location.isFallback,
+    );
+    setState(() {
+      _isResolvingLocation = false;
+      _concertsFuture = widget.repository.findNearby(_filters);
+    });
   }
 
   Future<void> _toggleFavorite(Concert concert) async {
@@ -91,7 +120,12 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
             return CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
-                  child: _Header(filters: _filters, onChanged: _updateFilters),
+                  child: _Header(
+                    filters: _filters,
+                    isResolvingLocation: _isResolvingLocation,
+                    onChanged: _updateFilters,
+                    onRefreshLocation: _resolveLocation,
+                  ),
                 ),
                 SliverToBoxAdapter(
                   child: _GenreFilters(
@@ -116,48 +150,56 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
                   const SliverFillRemaining(
                     child: Center(child: CircularProgressIndicator()),
                   )
-                else if (concerts.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _EmptyState(filters: _filters),
-                  )
                 else ...[
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                       child: ConcertMap(
                         concerts: concerts,
+                        userLocation: UserLocation(
+                          latitude: _filters.latitude,
+                          longitude: _filters.longitude,
+                          label: _filters.locationLabel,
+                          isFallback: _filters.usesFallbackLocation,
+                        ),
                         onConcertTap: _openDetail,
                       ),
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: _ResultsSummary(
-                      count: concerts.length,
-                      onlyFavorites: _filters.onlyFavorites,
-                      onFavoriteFilterChanged: (enabled) {
-                        _updateFilters(
-                          _filters.copyWith(onlyFavorites: enabled),
+                  if (concerts.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyState(filters: _filters),
+                    )
+                  else ...[
+                    SliverToBoxAdapter(
+                      child: _ResultsSummary(
+                        count: concerts.length,
+                        onlyFavorites: _filters.onlyFavorites,
+                        onFavoriteFilterChanged: (enabled) {
+                          _updateFilters(
+                            _filters.copyWith(onlyFavorites: enabled),
+                          );
+                        },
+                      ),
+                    ),
+                    SliverList.separated(
+                      itemCount: concerts.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final concert = concerts[index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: ConcertCard(
+                            concert: concert,
+                            onTap: () => _openDetail(concert),
+                            onFavoriteTap: () => _toggleFavorite(concert),
+                          ),
                         );
                       },
                     ),
-                  ),
-                  SliverList.separated(
-                    itemCount: concerts.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final concert = concerts[index];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: ConcertCard(
-                          concert: concert,
-                          onTap: () => _openDetail(concert),
-                          onFavoriteTap: () => _toggleFavorite(concert),
-                        ),
-                      );
-                    },
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  ],
                 ],
               ],
             );
@@ -169,10 +211,17 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.filters, required this.onChanged});
+  const _Header({
+    required this.filters,
+    required this.isResolvingLocation,
+    required this.onChanged,
+    required this.onRefreshLocation,
+  });
 
   final ConcertFilters filters;
+  final bool isResolvingLocation;
   final ValueChanged<ConcertFilters> onChanged;
+  final VoidCallback onRefreshLocation;
 
   @override
   Widget build(BuildContext context) {
@@ -190,10 +239,29 @@ class _Header extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Position actuelle : Lyon, France',
+            filters.usesFallbackLocation
+                ? 'Position par defaut : ${filters.locationLabel}'
+                : 'Position actuelle : ${filters.locationLabel}',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Colors.black.withValues(alpha: 0.62),
                 ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: isResolvingLocation ? null : onRefreshLocation,
+              icon: isResolvingLocation
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.my_location_rounded),
+              label: Text(
+                isResolvingLocation ? 'Localisation...' : 'Actualiser',
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           TextField(

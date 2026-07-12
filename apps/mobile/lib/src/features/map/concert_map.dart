@@ -3,12 +3,14 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../domain/concert.dart';
+import '../../domain/user_location.dart';
 import '../../theme/livearound_theme.dart';
 
 class ConcertMap extends StatelessWidget {
   const ConcertMap({
     required this.concerts,
     required this.onConcertTap,
+    this.userLocation,
     this.height = 240,
     this.initialZoom = 12,
     super.key,
@@ -16,6 +18,7 @@ class ConcertMap extends StatelessWidget {
 
   final List<Concert> concerts;
   final ValueChanged<Concert> onConcertTap;
+  final UserLocation? userLocation;
   final double height;
   final double initialZoom;
 
@@ -27,11 +30,16 @@ class ConcertMap extends StatelessWidget {
         .where((concert) =>
             concert.venue.latitude != 0 && concert.venue.longitude != 0)
         .toList();
-    final center = validConcerts.isEmpty
-        ? _defaultCenter
+    final center = userLocation == null
+        ? validConcerts.isEmpty
+            ? _defaultCenter
+            : LatLng(
+                validConcerts.first.venue.latitude,
+                validConcerts.first.venue.longitude,
+              )
         : LatLng(
-            validConcerts.first.venue.latitude,
-            validConcerts.first.venue.longitude,
+            userLocation!.latitude,
+            userLocation!.longitude,
           );
 
     return ClipRRect(
@@ -69,6 +77,16 @@ class ConcertMap extends StatelessWidget {
                       onTap: () => onConcertTap(concert),
                     ),
                   ),
+                if (userLocation != null)
+                  Marker(
+                    point: LatLng(
+                      userLocation!.latitude,
+                      userLocation!.longitude,
+                    ),
+                    width: 58,
+                    height: 58,
+                    child: _UserLocationMarker(location: userLocation!),
+                  ),
               ],
             ),
             const RichAttributionWidget(
@@ -97,6 +115,49 @@ class SingleConcertMap extends StatelessWidget {
       initialZoom: 15,
       height: 180,
       onConcertTap: (_) {},
+    );
+  }
+}
+
+class _UserLocationMarker extends StatelessWidget {
+  const _UserLocationMarker({required this.location});
+
+  final UserLocation location;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: location.isFallback
+          ? 'Position par defaut : ${location.label}'
+          : 'Votre position',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: LiveAroundTheme.teal, width: 3),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(7),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: LiveAroundTheme.teal,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.person_pin_circle_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
