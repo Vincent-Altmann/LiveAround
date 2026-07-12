@@ -36,6 +36,8 @@ class Concert {
     required this.priceFrom,
     required this.ticketUrl,
     required this.description,
+    this.source,
+    this.imageUrl,
     this.isFavorite = false,
   });
 
@@ -49,6 +51,8 @@ class Concert {
   final double priceFrom;
   final String ticketUrl;
   final String description;
+  final String? source;
+  final String? imageUrl;
   final bool isFavorite;
 
   factory Concert.fromJson(Map<String, dynamic> json) {
@@ -63,6 +67,8 @@ class Concert {
       priceFrom: (json['priceFrom'] as num?)?.toDouble() ?? 0,
       ticketUrl: json['ticketUrl'] as String? ?? '',
       description: json['description'] as String? ?? '',
+      source: json['source'] as String?,
+      imageUrl: json['imageUrl'] as String?,
       isFavorite: json['isFavorite'] as bool? ?? false,
     );
   }
@@ -79,6 +85,8 @@ class Concert {
       priceFrom: priceFrom,
       ticketUrl: ticketUrl,
       description: description,
+      source: source,
+      imageUrl: imageUrl,
       isFavorite: isFavorite ?? this.isFavorite,
     );
   }

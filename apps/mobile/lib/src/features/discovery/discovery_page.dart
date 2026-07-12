@@ -5,6 +5,7 @@ import '../../domain/concert.dart';
 import '../../domain/concert_filters.dart';
 import '../../theme/livearound_theme.dart';
 import '../concert/concert_detail_page.dart';
+import '../map/concert_map.dart';
 
 class DiscoveryPage extends StatefulWidget {
   const DiscoveryPage({required this.repository, super.key});
@@ -122,6 +123,15 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
                   )
                 else ...[
                   SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                      child: ConcertMap(
+                        concerts: concerts,
+                        onConcertTap: _openDetail,
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
                     child: _ResultsSummary(
                       count: concerts.length,
                       onlyFavorites: _filters.onlyFavorites,
@@ -193,94 +203,10 @@ class _Header extends StatelessWidget {
             ),
             onChanged: (value) => onChanged(filters.copyWith(query: value)),
           ),
-          const SizedBox(height: 16),
-          const _MapPreview(),
         ],
       ),
     );
   }
-}
-
-class _MapPreview extends StatelessWidget {
-  const _MapPreview();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 132,
-      decoration: BoxDecoration(
-        color: LiveAroundTheme.ink,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Positioned.fill(child: CustomPaint(painter: _MapPreviewPainter())),
-          Positioned(
-            left: 16,
-            top: 16,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.my_location_rounded, size: 18),
-                    SizedBox(width: 8),
-                    Text('Rayon actif'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MapPreviewPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
-      ..strokeWidth = 1;
-    for (var x = 0.0; x < size.width; x += 32) {
-      canvas.drawLine(Offset(x, 0), Offset(x + 48, size.height), gridPaint);
-    }
-    for (var y = 8.0; y < size.height; y += 28) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y - 24), gridPaint);
-    }
-
-    final center = Offset(size.width * 0.58, size.height * 0.52);
-    final radiusPaint = Paint()
-      ..color = LiveAroundTheme.teal.withValues(alpha: 0.42)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, 48, radiusPaint);
-
-    final pinPaint = Paint()..color = LiveAroundTheme.coral;
-    for (final offset in [
-      Offset(size.width * 0.42, size.height * 0.42),
-      Offset(size.width * 0.66, size.height * 0.34),
-      Offset(size.width * 0.72, size.height * 0.68),
-      Offset(size.width * 0.54, size.height * 0.72),
-    ]) {
-      canvas.drawCircle(offset, 5, pinPaint);
-      canvas.drawCircle(
-        offset,
-        9,
-        pinPaint..color = pinPaint.color.withValues(alpha: 0.18),
-      );
-      pinPaint.color = LiveAroundTheme.coral;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _GenreFilters extends StatelessWidget {

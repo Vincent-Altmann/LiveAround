@@ -44,7 +44,15 @@ class LiveAroundTheme {
         selectedColor: teal.withValues(alpha: 0.14),
         backgroundColor: Colors.white,
         side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        labelStyle: const TextStyle(
+          color: ink,
+          fontWeight: FontWeight.w600,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          color: ink,
+          fontWeight: FontWeight.w600,
+        ),
+        checkmarkColor: teal,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

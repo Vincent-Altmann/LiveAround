@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/concert_repository.dart';
 import '../../domain/concert.dart';
 import '../../theme/livearound_theme.dart';
+import '../map/concert_map.dart';
 
 class ConcertDetailPage extends StatefulWidget {
   const ConcertDetailPage({
@@ -81,6 +82,8 @@ class _ConcertDetailPageState extends State<ConcertDetailPage> {
               ),
               const SizedBox(height: 16),
               Text(concert.description),
+              const SizedBox(height: 20),
+              SingleConcertMap(concert: concert),
               const SizedBox(height: 20),
               _InfoSection(concert: concert),
               const SizedBox(height: 20),
