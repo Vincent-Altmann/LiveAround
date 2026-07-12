@@ -48,4 +48,3 @@ export class FindConcertsDto {
   @IsString()
   query?: string;
 }
-

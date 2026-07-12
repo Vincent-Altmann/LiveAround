@@ -13,11 +13,15 @@ class DiscoveryPage extends StatefulWidget {
   const DiscoveryPage({
     required this.repository,
     required this.locationLoader,
+    this.initialPreferredGenres,
+    this.initialRadiusKm,
     super.key,
   });
 
   final ConcertRepository repository;
   final UserLocationLoader locationLoader;
+  final Set<String>? initialPreferredGenres;
+  final double? initialRadiusKm;
 
   @override
   State<DiscoveryPage> createState() => _DiscoveryPageState();
@@ -40,6 +44,10 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
   @override
   void initState() {
     super.initState();
+    _filters = _filters.copyWith(
+      selectedGenres: widget.initialPreferredGenres,
+      radiusKm: widget.initialRadiusKm,
+    );
     _concertsFuture = widget.repository.findNearby(_filters);
     _resolveLocation();
   }

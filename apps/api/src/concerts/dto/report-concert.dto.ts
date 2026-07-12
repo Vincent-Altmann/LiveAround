@@ -5,4 +5,3 @@ export class ReportConcertDto {
   @MinLength(8)
   reason!: string;
 }
-

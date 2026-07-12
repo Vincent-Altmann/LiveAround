@@ -22,6 +22,7 @@ flowchart LR
 - Demander le consentement de localisation.
 - Proposer une ville manuelle si l'utilisateur refuse le GPS.
 - Afficher concerts, filtres, favoris et fiche detaillee.
+- Gerer un profil mobile local rattache a un compte API.
 - Recevoir les notifications push apres opt-in.
 
 ### API backend
@@ -30,6 +31,7 @@ flowchart LR
 - Rechercher les evenements proches via PostGIS.
 - Appliquer filtres et preferences.
 - Gerer favoris, signalements et alertes.
+- Gerer comptes mobiles, preferences de genres et rayon favori.
 - Exposer des endpoints REST stables pour le mobile.
 
 ### Base de donnees
@@ -53,4 +55,3 @@ flowchart LR
 3. Une regle anti-spam controle la frequence d'envoi.
 4. FCM envoie la notification.
 5. Les clics sont historises pour mesurer la pertinence.
-

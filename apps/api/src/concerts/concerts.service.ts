@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
+import { UsersService } from '../users/users.service';
 import { ConcertModel, ConcertReportModel } from './concert.model';
 import { FindConcertsDto } from './dto/find-concerts.dto';
 import { TicketmasterClient } from './ticketmaster.client';
@@ -7,18 +8,23 @@ import { TicketmasterClient } from './ticketmaster.client';
 @Injectable()
 export class ConcertsService {
   private readonly logger = new Logger(ConcertsService.name);
-  private readonly favorites = new Set<string>();
   private readonly reports: ConcertReportModel[] = [];
   private readonly cache = new Map<string, ConcertModel>();
 
-  constructor(private readonly ticketmasterClient: TicketmasterClient) {}
+  constructor(
+    private readonly ticketmasterClient: TicketmasterClient,
+    private readonly usersService: UsersService,
+  ) {}
 
-  async findNearby(query: FindConcertsDto) {
+  async findNearby(query: FindConcertsDto, deviceId?: string) {
+    const favorites = await this.usersService.getFavoriteIds(deviceId);
+    const effectiveQuery = await this.withUserPreferences(query, deviceId);
     if (this.ticketmasterClient.isEnabled()) {
       try {
-        const concerts = await this.ticketmasterClient.searchEvents(query);
+        const concerts =
+          await this.ticketmasterClient.searchEvents(effectiveQuery);
         concerts.forEach((concert) => this.cache.set(concert.id, concert));
-        return withFavorites(concerts, this.favorites);
+        return withFavorites(concerts, favorites);
       } catch (error) {
         this.logger.warn(
           `Ticketmaster indisponible, fallback mock active: ${errorMessage(error)}`,
@@ -26,15 +32,16 @@ export class ConcertsService {
       }
     }
 
-    return withFavorites(this.findSeedNearby(query), this.favorites);
+    return withFavorites(this.findSeedNearby(effectiveQuery), favorites);
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, deviceId?: string) {
+    const favorites = await this.usersService.getFavoriteIds(deviceId);
     const cached = this.cache.get(id);
     if (cached) {
       return {
         ...cached,
-        isFavorite: this.favorites.has(id),
+        isFavorite: favorites.has(id),
       };
     }
 
@@ -45,7 +52,7 @@ export class ConcertsService {
           this.cache.set(concert.id, concert);
           return {
             ...concert,
-            isFavorite: this.favorites.has(id),
+            isFavorite: favorites.has(id),
           };
         }
       } catch (error) {
@@ -59,30 +66,29 @@ export class ConcertsService {
     if (!concert) return null;
     return {
       ...concert,
-      isFavorite: this.favorites.has(id),
+      isFavorite: favorites.has(id),
     };
   }
 
-  async toggleFavorite(id: string) {
-    const concert = await this.findOne(id);
+  async toggleFavorite(id: string, deviceId?: string) {
+    const concert = await this.findOne(id, deviceId);
     if (!concert) {
       throw new NotFoundException('Concert introuvable');
     }
 
-    if (this.favorites.has(id)) {
-      this.favorites.delete(id);
-    } else {
-      this.favorites.add(id);
-    }
+    const isFavorite = await this.usersService.toggleFavorite(
+      deviceId,
+      concert,
+    );
 
     return {
-      concertId: id,
-      isFavorite: this.favorites.has(id),
+      ...concert,
+      isFavorite,
     };
   }
 
-  async report(concertId: string, reason: string) {
-    const concert = await this.findOne(concertId);
+  async report(concertId: string, reason: string, deviceId?: string) {
+    const concert = await this.findOne(concertId, deviceId);
     if (!concert) {
       throw new NotFoundException('Concert introuvable');
     }
@@ -94,6 +100,16 @@ export class ConcertsService {
     };
     this.reports.push(report);
     return report;
+  }
+
+  private async withUserPreferences(query: FindConcertsDto, deviceId?: string) {
+    const profile = await this.usersService.getOrCreateCurrentUser(deviceId);
+    if (query.genres.length > 0) return query;
+
+    return {
+      ...query,
+      genres: profile.preferredGenres,
+    };
   }
 
   private findSeedNearby(query: FindConcertsDto) {
@@ -110,7 +126,6 @@ export class ConcertsService {
           concert.venue.latitude,
           concert.venue.longitude,
         ),
-        isFavorite: this.favorites.has(concert.id),
       }))
       .filter((concert) => concert.distanceKm <= query.radiusKm)
       .filter((concert) => {
@@ -160,12 +175,13 @@ function distanceKm(
 
   const haversine =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.sin(dLon / 2) *
-      Math.sin(dLon / 2) *
-      Math.cos(latA) *
-      Math.cos(latB);
+    Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(latA) * Math.cos(latB);
 
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+  return (
+    earthRadiusKm *
+    2 *
+    Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+  );
 }
 
 function toRadians(value: number) {
@@ -188,7 +204,8 @@ const seedConcerts: ConcertModel[] = [
     },
     priceFrom: 32,
     ticketUrl: 'https://tickets.example/livearound/la-001',
-    description: 'Un concert rock nerveux dans une salle lyonnaise emblematique.',
+    description:
+      'Un concert rock nerveux dans une salle lyonnaise emblematique.',
   },
   {
     id: 'la-002',
@@ -222,7 +239,8 @@ const seedConcerts: ConcertModel[] = [
     },
     priceFrom: 24,
     ticketUrl: 'https://tickets.example/livearound/la-003',
-    description: 'Set electro nocturne, pense pour les amateurs de decouverte locale.',
+    description:
+      'Set electro nocturne, pense pour les amateurs de decouverte locale.',
   },
   {
     id: 'la-004',
@@ -239,7 +257,8 @@ const seedConcerts: ConcertModel[] = [
     },
     priceFrom: 18,
     ticketUrl: 'https://tickets.example/livearound/la-004',
-    description: 'Quartet jazz moderne, parfait pour une sortie de derniere minute.',
+    description:
+      'Quartet jazz moderne, parfait pour une sortie de derniere minute.',
   },
   {
     id: 'la-005',
@@ -256,7 +275,8 @@ const seedConcerts: ConcertModel[] = [
     },
     priceFrom: 39,
     ticketUrl: 'https://tickets.example/livearound/la-005',
-    description: 'Plateau rap francophone avec premiere partie locale selectionnee.',
+    description:
+      'Plateau rap francophone avec premiere partie locale selectionnee.',
   },
   {
     id: 'la-006',
@@ -273,6 +293,7 @@ const seedConcerts: ConcertModel[] = [
     },
     priceFrom: 21,
     ticketUrl: 'https://tickets.example/livearound/la-006',
-    description: 'Programme accessible autour de cordes et pieces orchestrales.',
+    description:
+      'Programme accessible autour de cordes et pieces orchestrales.',
   },
 ];

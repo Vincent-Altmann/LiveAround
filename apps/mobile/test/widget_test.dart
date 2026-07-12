@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:livearound_mobile/src/data/mock_account_repository.dart';
 import 'package:livearound_mobile/src/data/mock_concert_repository.dart';
 import 'package:livearound_mobile/src/domain/user_location.dart';
 import 'package:livearound_mobile/src/livearound_app.dart';
@@ -8,6 +9,7 @@ void main() {
     await tester.pumpWidget(
       LiveAroundApp(
         repository: MockConcertRepository(),
+        accountRepository: MockAccountRepository(),
         locationLoader: () async => UserLocation.lyonFallback,
       ),
     );

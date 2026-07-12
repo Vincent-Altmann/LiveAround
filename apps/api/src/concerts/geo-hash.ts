@@ -46,4 +46,3 @@ export function encodeGeoHash(
 
   return geohash;
 }
-

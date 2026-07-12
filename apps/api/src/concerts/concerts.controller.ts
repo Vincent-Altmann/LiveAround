@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   NotFoundException,
   Param,
   Post,
@@ -17,13 +18,19 @@ export class ConcertsController {
   constructor(private readonly concertsService: ConcertsService) {}
 
   @Get()
-  findNearby(@Query() query: FindConcertsDto) {
-    return this.concertsService.findNearby(query);
+  findNearby(
+    @Query() query: FindConcertsDto,
+    @Headers('x-livearound-device-id') deviceId?: string,
+  ) {
+    return this.concertsService.findNearby(query, deviceId);
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    const concert = await this.concertsService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @Headers('x-livearound-device-id') deviceId?: string,
+  ) {
+    const concert = await this.concertsService.findOne(id, deviceId);
     if (!concert) {
       throw new NotFoundException('Concert introuvable');
     }
@@ -31,12 +38,19 @@ export class ConcertsController {
   }
 
   @Post(':id/favorite')
-  async toggleFavorite(@Param('id') id: string) {
-    return this.concertsService.toggleFavorite(id);
+  async toggleFavorite(
+    @Param('id') id: string,
+    @Headers('x-livearound-device-id') deviceId?: string,
+  ) {
+    return this.concertsService.toggleFavorite(id, deviceId);
   }
 
   @Post(':id/report')
-  async report(@Param('id') id: string, @Body() body: ReportConcertDto) {
-    return this.concertsService.report(id, body.reason);
+  async report(
+    @Param('id') id: string,
+    @Body() body: ReportConcertDto,
+    @Headers('x-livearound-device-id') deviceId?: string,
+  ) {
+    return this.concertsService.report(id, body.reason, deviceId);
   }
 }

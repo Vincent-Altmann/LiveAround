@@ -81,14 +81,20 @@ export class TicketmasterClient {
     url.searchParams.set('apikey', this.apiKey);
     url.searchParams.set('countryCode', this.countryCode);
     url.searchParams.set('locale', this.locale);
-    url.searchParams.set('geoPoint', encodeGeoHash(query.latitude, query.longitude));
+    url.searchParams.set(
+      'geoPoint',
+      encodeGeoHash(query.latitude, query.longitude),
+    );
     url.searchParams.set('radius', String(query.radiusKm));
     url.searchParams.set('unit', 'km');
     url.searchParams.set('sort', 'distance,asc');
     url.searchParams.set('size', '50');
     url.searchParams.set('includeTBA', 'no');
     url.searchParams.set('includeTBD', 'no');
-    url.searchParams.set('classificationName', this.classificationName(query.genres));
+    url.searchParams.set(
+      'classificationName',
+      this.classificationName(query.genres),
+    );
 
     if (query.query?.trim()) {
       url.searchParams.set('keyword', query.query.trim());
@@ -144,7 +150,9 @@ export class TicketmasterClient {
       this.logger.warn(
         `Ticketmaster request failed ${response.status}: ${body.slice(0, 240)}`,
       );
-      throw new Error(`Ticketmaster request failed with status ${response.status}`);
+      throw new Error(
+        `Ticketmaster request failed with status ${response.status}`,
+      );
     }
 
     return response.json() as Promise<T>;
@@ -160,18 +168,27 @@ export class TicketmasterClient {
     const latitude = Number(venue?.location?.latitude);
     const longitude = Number(venue?.location?.longitude);
 
-    if (!id || !startsAt || !venue || Number.isNaN(latitude) || Number.isNaN(longitude)) {
+    if (
+      !id ||
+      !startsAt ||
+      !venue ||
+      Number.isNaN(latitude) ||
+      Number.isNaN(longitude)
+    ) {
       return null;
     }
 
     const distance =
       event.distance ??
       venue.distance ??
-      (query ? distanceKm(query.latitude, query.longitude, latitude, longitude) : 0);
+      (query
+        ? distanceKm(query.latitude, query.longitude, latitude, longitude)
+        : 0);
 
     return {
       id,
-      artist: event._embedded?.attractions?.[0]?.name ?? event.name ?? 'Artiste',
+      artist:
+        event._embedded?.attractions?.[0]?.name ?? event.name ?? 'Artiste',
       title: event.name ?? 'Concert',
       genre:
         event.classifications?.[0]?.genre?.name ??
@@ -182,14 +199,17 @@ export class TicketmasterClient {
       venue: {
         name: venue.name ?? 'Salle a confirmer',
         city: venue.city?.name ?? 'Ville a confirmer',
-        address: [venue.address?.line1, venue.address?.line2].filter(Boolean).join(', '),
+        address: [venue.address?.line1, venue.address?.line2]
+          .filter(Boolean)
+          .join(', '),
         latitude,
         longitude,
       },
       distanceKm: Number(distance.toFixed(1)),
       priceFrom: event.priceRanges?.[0]?.min ?? 0,
       ticketUrl: event.url ?? '',
-      description: event.info ?? event.pleaseNote ?? event.name ?? 'Concert Ticketmaster',
+      description:
+        event.info ?? event.pleaseNote ?? event.name ?? 'Concert Ticketmaster',
       source: 'ticketmaster',
       imageUrl: bestImageUrl(event),
     };
@@ -227,12 +247,13 @@ function distanceKm(
 
   const haversine =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.sin(dLon / 2) *
-      Math.sin(dLon / 2) *
-      Math.cos(latA) *
-      Math.cos(latB);
+    Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(latA) * Math.cos(latB);
 
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+  return (
+    earthRadiusKm *
+    2 *
+    Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+  );
 }
 
 function toRadians(value: number) {

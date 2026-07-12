@@ -21,6 +21,7 @@ export interface ConcertModel {
   description: string;
   source?: string;
   imageUrl?: string;
+  isFavorite?: boolean;
 }
 
 export interface ConcertReportModel {

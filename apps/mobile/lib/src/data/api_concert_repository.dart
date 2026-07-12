@@ -5,18 +5,22 @@ import 'package:http/http.dart' as http;
 import '../domain/concert.dart';
 import '../domain/concert_filters.dart';
 import 'concert_repository.dart';
+import 'device_identity_store.dart';
 
 class ApiConcertRepository implements ConcertRepository {
   ApiConcertRepository({
     required String baseUrl,
     required ConcertRepository fallbackRepository,
+    DeviceIdProvider? deviceIdProvider,
     http.Client? client,
   })  : _baseUri = Uri.parse(baseUrl),
         _fallbackRepository = fallbackRepository,
+        _deviceIdProvider = deviceIdProvider,
         _client = client ?? http.Client();
 
   final Uri _baseUri;
   final ConcertRepository _fallbackRepository;
+  final DeviceIdProvider? _deviceIdProvider;
   final http.Client _client;
 
   @override
@@ -95,7 +99,9 @@ class ApiConcertRepository implements ConcertRepository {
   }
 
   Future<dynamic> _getJson(Uri uri) async {
-    final response = await _client.get(uri).timeout(const Duration(seconds: 4));
+    final response = await _client
+        .get(uri, headers: await _headers())
+        .timeout(const Duration(seconds: 4));
     return _decode(response);
   }
 
@@ -103,11 +109,21 @@ class ApiConcertRepository implements ConcertRepository {
     final response = await _client
         .post(
           uri,
-          headers: {'content-type': 'application/json'},
+          headers: await _headers(json: body != null),
           body: body == null ? null : jsonEncode(body),
         )
         .timeout(const Duration(seconds: 4));
     return _decode(response);
+  }
+
+  Future<Map<String, String>> _headers({bool json = false}) async {
+    final headers = <String, String>{};
+    final deviceId = await _deviceIdProvider?.call();
+    if (deviceId != null && deviceId.isNotEmpty) {
+      headers['x-livearound-device-id'] = deviceId;
+    }
+    if (json) headers['content-type'] = 'application/json';
+    return headers;
   }
 
   dynamic _decode(http.Response response) {

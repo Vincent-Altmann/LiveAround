@@ -21,12 +21,12 @@ docs/       Documentation projet
 
 ## MVP fonctionnel vise
 
-- Compte utilisateur, puis preferences musicales
+- Compte utilisateur mobile et preferences musicales
 - Geolocalisation ou ville renseignee manuellement
 - Liste de concerts proches
 - Filtres par date, genre et distance
 - Fiche concert avec lien billetterie
-- Favoris
+- Favoris persistants par compte
 - Alertes personnalisees
 - Signalement d'une donnee incorrecte
 
@@ -78,11 +78,14 @@ Pour lancer PostgreSQL/PostGIS localement :
 docker compose up -d
 ```
 
+L'API cree ou charge le compte mobile via `POST /users/me`, puis rattache les preferences et favoris a l'en-tete `x-livearound-device-id`.
+
 ## Statut actuel
 
 Premiere base de code initialisee avec :
 
-- application Flutter MVP sur donnees mockees ;
-- API NestJS avec endpoints concerts, favoris et signalements ;
-- configuration Docker Compose PostGIS ;
+- application Flutter avec onglets Decouvrir, Favoris et Profil ;
+- API NestJS avec endpoints concerts, compte utilisateur, preferences, favoris et signalements ;
+- integration Ticketmaster pour les vrais concerts ;
+- configuration Docker Compose PostGIS et migrations applicatives de developpement ;
 - documentation d'architecture et de developpement.
