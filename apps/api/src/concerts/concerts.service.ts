@@ -1,29 +1,60 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
+import { TtlCache } from '../common/ttl-cache';
+import { DatabaseService } from '../database/database.service';
 import { UsersService } from '../users/users.service';
 import { ConcertModel, ConcertReportModel } from './concert.model';
 import { FindConcertsDto } from './dto/find-concerts.dto';
+import { distanceKm } from './geo.util';
 import { TicketmasterClient } from './ticketmaster.client';
+
+// Deux minutes suffisent pour absorber les rafales d'une meme zone (retours
+// en arriere, changements de filtre annules) sans servir de donnees perimees.
+const SEARCH_CACHE_TTL_MS = 2 * 60 * 1000;
+const SEARCH_CACHE_MAX_ENTRIES = 200;
+
+// Le detail d'un concert change rarement : TTL plus long, taille bornee pour
+// remplacer l'ancienne Map qui grossissait indefiniment.
+const DETAIL_CACHE_TTL_MS = 10 * 60 * 1000;
+const DETAIL_CACHE_MAX_ENTRIES = 500;
 
 @Injectable()
 export class ConcertsService {
   private readonly logger = new Logger(ConcertsService.name);
-  private readonly reports: ConcertReportModel[] = [];
-  private readonly cache = new Map<string, ConcertModel>();
+  private readonly fallbackReports: ConcertReportModel[] = [];
+  private readonly searchCache = new TtlCache<ConcertModel[]>(
+    SEARCH_CACHE_TTL_MS,
+    SEARCH_CACHE_MAX_ENTRIES,
+  );
+  private readonly detailCache = new TtlCache<ConcertModel>(
+    DETAIL_CACHE_TTL_MS,
+    DETAIL_CACHE_MAX_ENTRIES,
+  );
 
   constructor(
     private readonly ticketmasterClient: TicketmasterClient,
     private readonly usersService: UsersService,
+    private readonly database: DatabaseService,
   ) {}
 
   async findNearby(query: FindConcertsDto, deviceId?: string) {
     const favorites = await this.usersService.getFavoriteIds(deviceId);
     const effectiveQuery = await this.withUserPreferences(query, deviceId);
+
     if (this.ticketmasterClient.isEnabled()) {
+      const cacheKey = searchCacheKey(effectiveQuery);
+      const cached = this.searchCache.get(cacheKey);
+      if (cached) {
+        return withFavorites(cached, favorites);
+      }
+
       try {
         const concerts =
           await this.ticketmasterClient.searchEvents(effectiveQuery);
-        concerts.forEach((concert) => this.cache.set(concert.id, concert));
+        this.searchCache.set(cacheKey, concerts);
+        concerts.forEach((concert) =>
+          this.detailCache.set(concert.id, concert),
+        );
         return withFavorites(concerts, favorites);
       } catch (error) {
         this.logger.warn(
@@ -37,7 +68,7 @@ export class ConcertsService {
 
   async findOne(id: string, deviceId?: string) {
     const favorites = await this.usersService.getFavoriteIds(deviceId);
-    const cached = this.cache.get(id);
+    const cached = this.detailCache.get(id);
     if (cached) {
       return {
         ...cached,
@@ -49,7 +80,7 @@ export class ConcertsService {
       try {
         const concert = await this.ticketmasterClient.getEvent(id);
         if (concert) {
-          this.cache.set(concert.id, concert);
+          this.detailCache.set(concert.id, concert);
           return {
             ...concert,
             isFavorite: favorites.has(id),
@@ -87,19 +118,51 @@ export class ConcertsService {
     };
   }
 
-  async report(concertId: string, reason: string, deviceId?: string) {
+  async report(
+    concertId: string,
+    reason: string,
+    deviceId?: string,
+  ): Promise<ConcertReportModel> {
     const concert = await this.findOne(concertId, deviceId);
     if (!concert) {
       throw new NotFoundException('Concert introuvable');
     }
 
-    const report = {
-      concertId,
-      reason,
-      createdAt: new Date().toISOString(),
-    };
-    this.reports.push(report);
-    return report;
+    try {
+      const userId = deviceId
+        ? (await this.usersService.getOrCreateCurrentUser(deviceId)).id
+        : null;
+      const result = await this.database.query<{
+        id: string;
+        created_at: Date | string;
+      }>(
+        `
+          INSERT INTO concert_reports (user_id, concert_id, reason)
+          VALUES ($1, $2, $3)
+          RETURNING id, created_at
+        `,
+        [userId, concertId, reason],
+      );
+
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        concertId,
+        reason,
+        createdAt: toIso(row.created_at),
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Signalement conserve en memoire (base indisponible): ${errorMessage(error)}`,
+      );
+      const report = {
+        concertId,
+        reason,
+        createdAt: new Date().toISOString(),
+      };
+      this.fallbackReports.push(report);
+      return report;
+    }
   }
 
   private async withUserPreferences(query: FindConcertsDto, deviceId?: string) {
@@ -152,6 +215,20 @@ export class ConcertsService {
   }
 }
 
+// La position est arrondie a ~1 km pour que les petites variations GPS d'un
+// meme utilisateur (ou de voisins) partagent la meme entree de cache.
+function searchCacheKey(query: FindConcertsDto) {
+  return [
+    query.latitude.toFixed(2),
+    query.longitude.toFixed(2),
+    query.radiusKm,
+    [...query.genres].sort().join('+'),
+    query.from ?? '',
+    query.to ?? '',
+    query.query?.trim().toLowerCase() ?? '',
+  ].join('|');
+}
+
 function withFavorites(concerts: ConcertModel[], favorites: Set<string>) {
   return concerts.map((concert) => ({
     ...concert,
@@ -163,31 +240,10 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function distanceKm(
-  latitudeA: number,
-  longitudeA: number,
-  latitudeB: number,
-  longitudeB: number,
-) {
-  const earthRadiusKm = 6371;
-  const dLat = toRadians(latitudeB - latitudeA);
-  const dLon = toRadians(longitudeB - longitudeA);
-  const latA = toRadians(latitudeA);
-  const latB = toRadians(latitudeB);
-
-  const haversine =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(latA) * Math.cos(latB);
-
-  return (
-    earthRadiusKm *
-    2 *
-    Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
-  );
-}
-
-function toRadians(value: number) {
-  return (value * Math.PI) / 180;
+function toIso(value: Date | string) {
+  return value instanceof Date
+    ? value.toISOString()
+    : new Date(value).toISOString();
 }
 
 const seedConcerts: ConcertModel[] = [

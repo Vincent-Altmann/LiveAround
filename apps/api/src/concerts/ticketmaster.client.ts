@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { ConcertModel } from './concert.model';
 import { FindConcertsDto } from './dto/find-concerts.dto';
 import { encodeGeoHash } from './geo-hash';
+import { distanceKm } from './geo.util';
 
 interface TicketmasterEvent {
   id?: string;
@@ -135,10 +136,7 @@ export class TicketmasterClient {
   }
 
   private classificationName(genres: string[]) {
-    if (genres.length === 0) return 'music';
-    return genres
-      .map((genre) => GENRE_TO_TICKETMASTER[genre.toLowerCase()] ?? genre)
-      .join(',');
+    return mapGenresToClassificationName(genres);
   }
 
   private async getJson<T>(url: URL): Promise<T> {
@@ -240,7 +238,14 @@ const TICKETMASTER_TO_DISPLAY: Record<string, string> = {
   classical: 'Classique',
 };
 
-function toDisplayGenre(genre: string) {
+export function mapGenresToClassificationName(genres: string[]) {
+  if (genres.length === 0) return 'music';
+  return genres
+    .map((genre) => GENRE_TO_TICKETMASTER[genre.toLowerCase()] ?? genre)
+    .join(',');
+}
+
+export function toDisplayGenre(genre: string) {
   return TICKETMASTER_TO_DISPLAY[genre.toLowerCase()] ?? genre;
 }
 
@@ -259,31 +264,4 @@ function bestImageUrl(event: TicketmasterEvent) {
 
 function toTicketmasterDate(value: string) {
   return new Date(value).toISOString().replace('.000Z', 'Z');
-}
-
-function distanceKm(
-  latitudeA: number,
-  longitudeA: number,
-  latitudeB: number,
-  longitudeB: number,
-) {
-  const earthRadiusKm = 6371;
-  const dLat = toRadians(latitudeB - latitudeA);
-  const dLon = toRadians(longitudeB - longitudeA);
-  const latA = toRadians(latitudeA);
-  const latB = toRadians(latitudeB);
-
-  const haversine =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(latA) * Math.cos(latB);
-
-  return (
-    earthRadiusKm *
-    2 *
-    Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
-  );
-}
-
-function toRadians(value: number) {
-  return (value * Math.PI) / 180;
 }
