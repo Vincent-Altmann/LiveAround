@@ -33,6 +33,9 @@ class ApiConcertRepository implements ConcertRepository {
         if (filters.query.trim().isNotEmpty) 'query': filters.query.trim(),
         if (filters.selectedGenres.isNotEmpty)
           'genres': filters.selectedGenres.join(','),
+        if (filters.from != null)
+          'from': filters.from!.toUtc().toIso8601String(),
+        if (filters.to != null) 'to': filters.to!.toUtc().toIso8601String(),
       });
 
       final payload = await _getJson(uri);
@@ -60,14 +63,13 @@ class ApiConcertRepository implements ConcertRepository {
   @override
   Future<Concert> toggleFavorite(String id) async {
     try {
-      await _postJson(_buildUri('/concerts/$id/favorite'));
-      final concert = await findById(id);
-      if (concert != null) return concert;
+      // La reponse du POST contient deja le concert mis a jour : inutile de
+      // refaire un GET derriere.
+      final payload = await _postJson(_buildUri('/concerts/$id/favorite'));
+      return Concert.fromJson(payload as Map<String, dynamic>);
     } catch (_) {
       return _fallbackRepository.toggleFavorite(id);
     }
-
-    return _fallbackRepository.toggleFavorite(id);
   }
 
   @override

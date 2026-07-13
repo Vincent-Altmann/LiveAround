@@ -277,7 +277,9 @@ class _InfoSection extends StatelessWidget {
             ),
             _InfoRow(
               icon: Icons.euro_rounded,
-              label: 'A partir de ${concert.priceFrom.round()} EUR',
+              label: concert.priceFrom > 0
+                  ? 'A partir de ${concert.priceFrom.round()} EUR'
+                  : 'Prix non communique',
             ),
           ],
         ),

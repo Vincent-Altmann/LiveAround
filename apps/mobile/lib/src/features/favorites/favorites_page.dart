@@ -62,6 +62,34 @@ class _FavoritesPageState extends State<FavoritesPage> {
               return const Center(child: CircularProgressIndicator());
             }
 
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.wifi_off_rounded, size: 48),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Impossible de charger vos favoris',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: () => setState(_refresh),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Reessayer'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
             final concerts = snapshot.data ?? const <Concert>[];
             if (concerts.isEmpty) {
               return const _EmptyFavorites();

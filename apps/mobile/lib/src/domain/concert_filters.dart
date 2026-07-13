@@ -8,6 +8,9 @@ class ConcertFilters {
     this.longitude = 4.8357,
     this.locationLabel = 'Lyon, France',
     this.usesFallbackLocation = true,
+    this.from,
+    this.to,
+    this.dateLabel = 'Toutes les dates',
   });
 
   final String query;
@@ -18,6 +21,15 @@ class ConcertFilters {
   final double longitude;
   final String locationLabel;
   final bool usesFallbackLocation;
+  final DateTime? from;
+  final DateTime? to;
+  final String dateLabel;
+
+  bool get hasDateRange => from != null || to != null;
+
+  // Sentinelle pour permettre a copyWith de remettre from/to a null
+  // (le classique `from ?? this.from` ne sait pas effacer une valeur).
+  static const Object _unset = Object();
 
   ConcertFilters copyWith({
     String? query,
@@ -28,6 +40,9 @@ class ConcertFilters {
     double? longitude,
     String? locationLabel,
     bool? usesFallbackLocation,
+    Object? from = _unset,
+    Object? to = _unset,
+    String? dateLabel,
   }) {
     return ConcertFilters(
       query: query ?? this.query,
@@ -38,6 +53,9 @@ class ConcertFilters {
       longitude: longitude ?? this.longitude,
       locationLabel: locationLabel ?? this.locationLabel,
       usesFallbackLocation: usesFallbackLocation ?? this.usesFallbackLocation,
+      from: identical(from, _unset) ? this.from : from as DateTime?,
+      to: identical(to, _unset) ? this.to : to as DateTime?,
+      dateLabel: dateLabel ?? this.dateLabel,
     );
   }
 }

@@ -20,12 +20,21 @@ class MockConcertRepository implements ConcertRepository {
       final matchesGenre = filters.selectedGenres.isEmpty ||
           filters.selectedGenres.contains(concert.genre);
       final matchesFavorite = !filters.onlyFavorites || concert.isFavorite;
+      final matchesFrom =
+          filters.from == null || !concert.startsAt.isBefore(filters.from!);
+      final matchesTo =
+          filters.to == null || !concert.startsAt.isAfter(filters.to!);
       final matchesQuery = normalizedQuery.isEmpty ||
           concert.artist.toLowerCase().contains(normalizedQuery) ||
           concert.title.toLowerCase().contains(normalizedQuery) ||
           concert.venue.city.toLowerCase().contains(normalizedQuery);
 
-      return matchesRadius && matchesGenre && matchesFavorite && matchesQuery;
+      return matchesRadius &&
+          matchesGenre &&
+          matchesFavorite &&
+          matchesFrom &&
+          matchesTo &&
+          matchesQuery;
     }).toList()
       ..sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
 
