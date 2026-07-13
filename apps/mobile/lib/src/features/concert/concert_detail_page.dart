@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/concert_repository.dart';
 import '../../domain/concert.dart';
@@ -33,6 +34,33 @@ class _ConcertDetailPageState extends State<ConcertDetailPage> {
     setState(() {
       _concertFuture = widget.repository.findById(widget.concertId);
     });
+  }
+
+  Future<void> _openTickets(Concert concert) async {
+    final url = Uri.tryParse(concert.ticketUrl);
+    if (url == null || !url.hasScheme) {
+      _showMessage('Billetterie indisponible pour ce concert.');
+      return;
+    }
+
+    try {
+      final launched = await launchUrl(
+        url,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        _showMessage('Impossible d\'ouvrir la billetterie.');
+      }
+    } catch (_) {
+      _showMessage('Impossible d\'ouvrir la billetterie.');
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> _report(Concert concert) async {
@@ -91,13 +119,9 @@ class _ConcertDetailPageState extends State<ConcertDetailPage> {
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Billetterie : ${concert.ticketUrl}'),
-                          ),
-                        );
-                      },
+                      onPressed: concert.ticketUrl.isEmpty
+                          ? null
+                          : () => _openTickets(concert),
                       icon: const Icon(Icons.confirmation_number_outlined),
                       label: const Text('Billetterie'),
                     ),
