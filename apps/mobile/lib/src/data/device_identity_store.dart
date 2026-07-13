@@ -7,7 +7,7 @@ typedef DeviceIdProvider = Future<String> Function();
 class DeviceIdentityStore {
   const DeviceIdentityStore();
 
-  static const _deviceIdKey = 'livearound.device_id';
+  static const _deviceIdKey = 'livearound.auth_session_device_id';
 
   Future<String?> readDeviceId() async {
     final preferences = await SharedPreferences.getInstance();
