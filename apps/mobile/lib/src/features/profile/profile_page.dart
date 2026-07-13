@@ -9,12 +9,14 @@ class ProfilePage extends StatefulWidget {
     required this.accountRepository,
     required this.initialProfile,
     required this.onProfileChanged,
+    required this.onSignOut,
     super.key,
   });
 
   final AccountRepository accountRepository;
   final UserProfile initialProfile;
   final ValueChanged<UserProfile> onProfileChanged;
+  final VoidCallback onSignOut;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -185,6 +187,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     )
                   : const Icon(Icons.save_outlined),
               label: Text(_isSaving ? 'Enregistrement...' : 'Enregistrer'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _isSaving ? null : widget.onSignOut,
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Se deconnecter'),
             ),
           ],
         ),

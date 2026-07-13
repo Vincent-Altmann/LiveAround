@@ -11,23 +11,81 @@ import 'mock_account_repository.dart';
 class ApiAccountRepository implements AccountRepository {
   ApiAccountRepository({
     required String baseUrl,
-    required DeviceIdProvider deviceIdProvider,
+    required DeviceIdentityStore identityStore,
     AccountRepository? fallbackRepository,
     http.Client? client,
   })  : _baseUri = Uri.parse(baseUrl),
-        _deviceIdProvider = deviceIdProvider,
+        _identityStore = identityStore,
         _fallbackRepository = fallbackRepository ?? MockAccountRepository(),
         _client = client ?? http.Client();
 
   final Uri _baseUri;
-  final DeviceIdProvider _deviceIdProvider;
+  final DeviceIdentityStore _identityStore;
   final AccountRepository _fallbackRepository;
   final http.Client _client;
 
   @override
+  Future<UserProfile?> restoreSession() async {
+    final deviceId = await _identityStore.readDeviceId();
+    if (deviceId == null || deviceId.isEmpty) return null;
+
+    try {
+      final payload = await _getJson(_buildUri('/users/me'));
+      return UserProfile.fromJson(payload as Map<String, dynamic>);
+    } catch (_) {
+      return _fallbackRepository.restoreSession();
+    }
+  }
+
+  @override
+  Future<UserProfile> login({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final payload = await _postJson(
+        _buildUri('/auth/login'),
+        body: {'email': email.trim(), 'password': password},
+        includeDeviceId: false,
+      );
+      return _saveAuthSession(payload as Map<String, dynamic>);
+    } catch (error) {
+      if (error is ApiRequestException && error.isClientError) rethrow;
+      return _fallbackRepository.login(email: email, password: password);
+    }
+  }
+
+  @override
+  Future<UserProfile> register({
+    required String displayName,
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final payload = await _postJson(
+        _buildUri('/auth/register'),
+        body: {
+          'displayName': displayName.trim(),
+          'email': email.trim(),
+          'password': password,
+        },
+        includeDeviceId: false,
+      );
+      return _saveAuthSession(payload as Map<String, dynamic>);
+    } catch (error) {
+      if (error is ApiRequestException && error.isClientError) rethrow;
+      return _fallbackRepository.register(
+        displayName: displayName,
+        email: email,
+        password: password,
+      );
+    }
+  }
+
+  @override
   Future<UserProfile> loadProfile() async {
     try {
-      final deviceId = await _deviceIdProvider();
+      final deviceId = await _identityStore.getOrCreateDeviceId();
       final payload = await _postJson(
         _buildUri('/users/me'),
         body: {'deviceId': deviceId},
@@ -44,7 +102,7 @@ class ApiAccountRepository implements AccountRepository {
     required String email,
   }) async {
     try {
-      final deviceId = await _deviceIdProvider();
+      final deviceId = await _identityStore.getOrCreateDeviceId();
       final payload = await _postJson(
         _buildUri('/users/me'),
         body: {
@@ -97,6 +155,12 @@ class ApiAccountRepository implements AccountRepository {
     }
   }
 
+  @override
+  Future<void> signOut() async {
+    await _identityStore.clearDeviceId();
+    await _fallbackRepository.signOut();
+  }
+
   Uri _buildUri(String path) {
     final normalizedBase = _baseUri.path.endsWith('/')
         ? _baseUri
@@ -105,10 +169,15 @@ class ApiAccountRepository implements AccountRepository {
     return normalizedBase.resolve(path.replaceFirst(RegExp('^/'), ''));
   }
 
-  Future<Map<String, String>> _headers({bool json = false}) async {
-    final headers = <String, String>{
-      'x-livearound-device-id': await _deviceIdProvider(),
-    };
+  Future<Map<String, String>> _headers({
+    bool json = false,
+    bool includeDeviceId = true,
+  }) async {
+    final headers = <String, String>{};
+    if (includeDeviceId) {
+      headers['x-livearound-device-id'] =
+          await _identityStore.getOrCreateDeviceId();
+    }
     if (json) headers['content-type'] = 'application/json';
     return headers;
   }
@@ -120,11 +189,18 @@ class ApiAccountRepository implements AccountRepository {
     return _decode(response);
   }
 
-  Future<dynamic> _postJson(Uri uri, {Map<String, dynamic>? body}) async {
+  Future<dynamic> _postJson(
+    Uri uri, {
+    Map<String, dynamic>? body,
+    bool includeDeviceId = true,
+  }) async {
     final response = await _client
         .post(
           uri,
-          headers: await _headers(json: body != null),
+          headers: await _headers(
+            json: body != null,
+            includeDeviceId: includeDeviceId,
+          ),
           body: body == null ? null : jsonEncode(body),
         )
         .timeout(const Duration(seconds: 4));
@@ -145,9 +221,26 @@ class ApiAccountRepository implements AccountRepository {
 
   dynamic _decode(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError('API error ${response.statusCode}');
+      throw ApiRequestException(response.statusCode);
     }
     if (response.body.isEmpty) return null;
     return jsonDecode(response.body);
   }
+
+  Future<UserProfile> _saveAuthSession(Map<String, dynamic> payload) async {
+    final deviceId = payload['deviceId'] as String? ?? '';
+    if (deviceId.isNotEmpty) {
+      await _identityStore.saveDeviceId(deviceId);
+    }
+
+    return UserProfile.fromJson(payload['profile'] as Map<String, dynamic>);
+  }
+}
+
+class ApiRequestException implements Exception {
+  const ApiRequestException(this.statusCode);
+
+  final int statusCode;
+
+  bool get isClientError => statusCode >= 400 && statusCode < 500;
 }

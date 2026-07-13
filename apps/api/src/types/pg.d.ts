@@ -1,6 +1,8 @@
 declare module 'pg' {
   export interface PoolConfig {
     connectionString?: string;
+    connectionTimeoutMillis?: number;
+    idleTimeoutMillis?: number;
   }
 
   export interface QueryResult<T extends object = Record<string, unknown>> {

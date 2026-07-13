@@ -18,7 +18,7 @@ flutter run
 
 Le MVP mobile appelle l'API NestJS lorsque `LIVEAROUND_API_BASE_URL` est disponible, avec un fallback mock pour conserver une experience testable hors ligne.
 
-L'application cree un identifiant local avec `shared_preferences`. Cet identifiant est envoye a l'API dans l'en-tete `x-livearound-device-id` afin de rattacher profil, preferences et favoris au meme compte mobile.
+L'application affiche d'abord une page de connexion. Apres connexion ou creation de compte, l'identifiant de session renvoye par l'API est conserve avec `shared_preferences` puis envoye dans l'en-tete `x-livearound-device-id`.
 
 ## API
 
@@ -37,6 +37,8 @@ http://localhost:3000
 Endpoints initiaux :
 
 - `GET /health`
+- `POST /auth/register`
+- `POST /auth/login`
 - `POST /users/me`
 - `GET /users/me`
 - `PATCH /users/me/preferences`
@@ -45,6 +47,22 @@ Endpoints initiaux :
 - `GET /concerts/:id`
 - `POST /concerts/:id/favorite`
 - `POST /concerts/:id/report`
+
+Exemple de creation de compte :
+
+```bash
+curl -X POST http://localhost:3000/auth/register \
+  -H "content-type: application/json" \
+  -d '{"displayName":"Demo","email":"demo@livearound.local","password":"Concerts123!"}'
+```
+
+Exemple de connexion :
+
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "content-type: application/json" \
+  -d '{"email":"demo@livearound.local","password":"Concerts123!"}'
+```
 
 Exemple de creation ou chargement du compte courant :
 
@@ -67,7 +85,7 @@ curl -X PATCH http://localhost:3000/users/me/preferences \
 
 ```bash
 cd apps/api
-docker compose up -d
+"C:\Program Files\Docker\Docker\resources\bin\docker.exe" compose up -d
 ```
 
 PostgreSQL est expose sur `localhost:5432`.
@@ -75,15 +93,28 @@ PostgreSQL est expose sur `localhost:5432`.
 L'API applique les migrations de developpement au demarrage :
 
 - ajout de `device_id` sur `users` ;
+- hash de mot de passe `password_hash` ;
 - preferences `preferred_genres` et `preferred_radius_km` ;
 - table `user_concert_favorites` pour les favoris Ticketmaster sauvegardes avec un snapshot JSON.
 
 Si PostgreSQL n'est pas joignable en local, l'API demarre tout de meme avec un stockage volatile afin de garder l'application mobile testable.
 
+### Docker Desktop sous Windows
+
+Docker Desktop est installe dans `C:\Program Files\Docker\Docker` lorsque l'installeur officiel est utilise. Si `docker info` indique que le daemon n'est pas joignable et que `wsl --status` indique que WSL n'est pas installe, ouvrir PowerShell en administrateur puis lancer :
+
+```powershell
+dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+wsl --install
+```
+
+Redemarrer Windows si l'une de ces commandes le demande, ouvrir Docker Desktop, puis relancer la commande `docker compose up -d` depuis `apps/api`.
+
 ## Prochaines integrations
 
 - Cle Ticketmaster reelle dans `apps/api/.env`.
 - Geocodage ville -> latitude/longitude.
-- Authentification utilisateur JWT/email.
+- Jetons JWT pour remplacer le `deviceId` de session MVP.
 - Persistance avancee des signalements.
 - Firebase Cloud Messaging.

@@ -2,6 +2,19 @@ import '../domain/concert.dart';
 import '../domain/user_profile.dart';
 
 abstract interface class AccountRepository {
+  Future<UserProfile?> restoreSession();
+
+  Future<UserProfile> login({
+    required String email,
+    required String password,
+  });
+
+  Future<UserProfile> register({
+    required String displayName,
+    required String email,
+    required String password,
+  });
+
   Future<UserProfile> loadProfile();
 
   Future<UserProfile> saveProfile({
@@ -15,4 +28,6 @@ abstract interface class AccountRepository {
   });
 
   Future<List<Concert>> findFavorites();
+
+  Future<void> signOut();
 }

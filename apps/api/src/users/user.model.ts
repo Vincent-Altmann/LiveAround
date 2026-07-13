@@ -9,6 +9,11 @@ export interface UserProfileModel {
   updatedAt: string;
 }
 
+export interface AuthSessionModel {
+  deviceId: string;
+  profile: UserProfileModel;
+}
+
 export interface FavoriteConcertRow {
   concert_external_id: string;
   concert_snapshot: unknown;
@@ -16,8 +21,10 @@ export interface FavoriteConcertRow {
 
 export interface UserRow {
   id: string;
+  device_id: string | null;
   email: string;
   display_name: string | null;
+  password_hash?: string | null;
   preferred_genres: string[] | null;
   preferred_radius_km: number | null;
   favorites_count?: string | number | null;

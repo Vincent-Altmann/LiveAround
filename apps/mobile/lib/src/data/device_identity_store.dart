@@ -9,6 +9,21 @@ class DeviceIdentityStore {
 
   static const _deviceIdKey = 'livearound.device_id';
 
+  Future<String?> readDeviceId() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(_deviceIdKey);
+  }
+
+  Future<void> saveDeviceId(String deviceId) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_deviceIdKey, deviceId);
+  }
+
+  Future<void> clearDeviceId() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(_deviceIdKey);
+  }
+
   Future<String> getOrCreateDeviceId() async {
     final preferences = await SharedPreferences.getInstance();
     final current = preferences.getString(_deviceIdKey);

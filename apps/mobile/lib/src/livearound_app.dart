@@ -9,7 +9,7 @@ import 'data/device_identity_store.dart';
 import 'data/mock_account_repository.dart';
 import 'data/mock_concert_repository.dart';
 import 'data/user_location_service.dart';
-import 'features/home/home_shell.dart';
+import 'features/auth/auth_gate.dart';
 import 'theme/livearound_theme.dart';
 
 class LiveAroundApp extends StatelessWidget {
@@ -20,8 +20,9 @@ class LiveAroundApp extends StatelessWidget {
     UserLocationLoader? locationLoader,
     Key? key,
   }) {
+    const identityStore = DeviceIdentityStore();
     final resolvedDeviceIdProvider =
-        deviceIdProvider ?? const DeviceIdentityStore().getOrCreateDeviceId;
+        deviceIdProvider ?? identityStore.getOrCreateDeviceId;
     final fallbackConcertRepository = MockConcertRepository();
 
     return LiveAroundApp._(
@@ -34,7 +35,7 @@ class LiveAroundApp extends StatelessWidget {
       accountRepository: accountRepository ??
           ApiAccountRepository(
             baseUrl: LiveAroundConfig.apiBaseUrl,
-            deviceIdProvider: resolvedDeviceIdProvider,
+            identityStore: identityStore,
             fallbackRepository: MockAccountRepository(
               concertRepository: fallbackConcertRepository,
             ),
@@ -62,7 +63,7 @@ class LiveAroundApp extends StatelessWidget {
       title: 'LiveAround',
       debugShowCheckedModeBanner: false,
       theme: LiveAroundTheme.light(),
-      home: HomeShell(
+      home: AuthGate(
         repository: repository,
         accountRepository: accountRepository,
         locationLoader: locationLoader,

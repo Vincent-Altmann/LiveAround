@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   device_id TEXT UNIQUE,
   email TEXT UNIQUE NOT NULL,
+  password_hash TEXT,
   display_name TEXT,
   home_city TEXT,
   home_location GEOGRAPHY(POINT, 4326),

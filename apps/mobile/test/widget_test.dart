@@ -5,7 +5,7 @@ import 'package:livearound_mobile/src/domain/user_location.dart';
 import 'package:livearound_mobile/src/livearound_app.dart';
 
 void main() {
-  testWidgets('shows LiveAround discovery screen', (tester) async {
+  testWidgets('shows LiveAround authentication screen', (tester) async {
     await tester.pumpWidget(
       LiveAroundApp(
         repository: MockConcertRepository(),
@@ -16,6 +16,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('LiveAround'), findsOneWidget);
-    expect(find.text('Concerts proches de vous'), findsOneWidget);
+    expect(find.text('Connexion'), findsOneWidget);
+    expect(find.text('Creer'), findsOneWidget);
   });
 }

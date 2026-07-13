@@ -13,12 +13,16 @@ class HomeShell extends StatefulWidget {
     required this.repository,
     required this.accountRepository,
     required this.locationLoader,
+    required this.initialProfile,
+    required this.onSignOut,
     super.key,
   });
 
   final ConcertRepository repository;
   final AccountRepository accountRepository;
   final UserLocationLoader locationLoader;
+  final UserProfile initialProfile;
+  final VoidCallback onSignOut;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -34,6 +38,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    _profile = widget.initialProfile;
     _profileFuture = widget.accountRepository.loadProfile();
     _profileFuture.then((profile) {
       if (!mounted) return;
@@ -80,6 +85,7 @@ class _HomeShellState extends State<HomeShell> {
                 accountRepository: widget.accountRepository,
                 initialProfile: _profile ?? snapshot.data ?? UserProfile.demo,
                 onProfileChanged: _handleProfileChanged,
+                onSignOut: widget.onSignOut,
               );
             },
           ),

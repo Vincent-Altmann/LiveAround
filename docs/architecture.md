@@ -21,8 +21,9 @@ flowchart LR
 - Gerer l'experience utilisateur.
 - Demander le consentement de localisation.
 - Proposer une ville manuelle si l'utilisateur refuse le GPS.
+- Afficher la connexion ou la creation de compte au demarrage.
 - Afficher concerts, filtres, favoris et fiche detaillee.
-- Gerer un profil mobile local rattache a un compte API.
+- Conserver l'identifiant de session du compte API.
 - Recevoir les notifications push apres opt-in.
 
 ### API backend
@@ -30,8 +31,9 @@ flowchart LR
 - Normaliser les donnees concerts.
 - Rechercher les evenements proches via PostGIS.
 - Appliquer filtres et preferences.
+- Authentifier les utilisateurs par email et mot de passe hashe.
 - Gerer favoris, signalements et alertes.
-- Gerer comptes mobiles, preferences de genres et rayon favori.
+- Gerer comptes, preferences de genres et rayon favori.
 - Exposer des endpoints REST stables pour le mobile.
 
 ### Base de donnees

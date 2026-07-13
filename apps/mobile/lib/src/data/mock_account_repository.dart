@@ -10,6 +10,49 @@ class MockAccountRepository implements AccountRepository {
 
   final MockConcertRepository _concertRepository;
   UserProfile _profile = UserProfile.demo;
+  String? _password;
+  var _isAuthenticated = false;
+
+  @override
+  Future<UserProfile?> restoreSession() async {
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    return _isAuthenticated ? loadProfile() : null;
+  }
+
+  @override
+  Future<UserProfile> login({
+    required String email,
+    required String password,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    final normalizedEmail = email.trim().toLowerCase();
+    if (_password != null &&
+        (_password != password || _profile.email != normalizedEmail)) {
+      throw StateError('Identifiants invalides');
+    }
+
+    _isAuthenticated = true;
+    _profile = _profile.copyWith(email: normalizedEmail);
+    return _profile;
+  }
+
+  @override
+  Future<UserProfile> register({
+    required String displayName,
+    required String email,
+    required String password,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    _password = password;
+    _isAuthenticated = true;
+    _profile = _profile.copyWith(
+      displayName: displayName.trim().isEmpty
+          ? UserProfile.demo.displayName
+          : displayName.trim(),
+      email: email.trim().toLowerCase(),
+    );
+    return _profile;
+  }
 
   @override
   Future<UserProfile> loadProfile() async {
@@ -53,5 +96,10 @@ class MockAccountRepository implements AccountRepository {
       const ConcertFilters(radiusKm: 200, onlyFavorites: true),
     );
     return concerts.where((concert) => concert.isFavorite).toList();
+  }
+
+  @override
+  Future<void> signOut() async {
+    _isAuthenticated = false;
   }
 }

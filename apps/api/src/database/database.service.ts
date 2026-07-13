@@ -18,6 +18,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       connectionString:
         config.get<string>('DATABASE_URL') ??
         'postgres://livearound:livearound@localhost:5432/livearound',
+      connectionTimeoutMillis: 1500,
+      idleTimeoutMillis: 5000,
     });
   }
 
@@ -64,6 +66,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       );
 
       ALTER TABLE users ADD COLUMN IF NOT EXISTS device_id TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_genres TEXT[] NOT NULL DEFAULT '{}'::text[];
       ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_radius_km INTEGER NOT NULL DEFAULT 25;
 
