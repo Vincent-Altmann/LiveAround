@@ -4,4 +4,8 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Autorise le HTTP en clair vers l'API locale (http://10.0.2.2:3000)
+         uniquement pour les builds de debug ; les builds release restent
+         soumis au blocage cleartext d'Android 9+. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>
