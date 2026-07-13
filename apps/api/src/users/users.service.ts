@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   Logger,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto';
@@ -26,7 +27,6 @@ interface EditableUserFields {
 interface FallbackUserState {
   profile: UserProfileModel;
   favorites: Map<string, ConcertModel>;
-  passwordHash?: string;
 }
 
 @Injectable()
@@ -72,21 +72,15 @@ export class UsersService {
         throw new ConflictException('Un compte existe deja avec cet email');
       }
 
-      this.warnFallback(error);
-      const existing = this.findFallbackUserByEmail(email);
-      if (existing) {
-        throw new ConflictException('Un compte existe deja avec cet email');
-      }
-
-      const fallback = this.getFallbackUser(deviceId, {
-        email,
-        displayName,
-      });
-      fallback.passwordHash = passwordHash;
-      return {
-        deviceId,
-        profile: fallback.profile,
-      };
+      // Pas de repli en memoire pour la creation de compte : un compte
+      // volatil disparaitrait au redemarrage du serveur sans que
+      // l'utilisateur le sache.
+      this.logger.error(
+        `Creation de compte impossible: ${errorMessage(error)}`,
+      );
+      throw new ServiceUnavailableException(
+        'Base de donnees indisponible, reessayez plus tard',
+      );
     }
   }
 
@@ -144,19 +138,12 @@ export class UsersService {
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
 
-      this.warnFallback(error);
-      const fallback = this.findFallbackUserByEmail(email);
-      if (
-        !fallback?.passwordHash ||
-        !verifyPassword(body.password, fallback.passwordHash)
-      ) {
-        throw new UnauthorizedException('Identifiants invalides');
-      }
-
-      return {
-        deviceId: fallback.profile.id,
-        profile: fallback.profile,
-      };
+      // Meme logique que registerAccount : une connexion ne doit jamais
+      // reussir sur un etat en memoire.
+      this.logger.error(`Connexion impossible: ${errorMessage(error)}`);
+      throw new ServiceUnavailableException(
+        'Base de donnees indisponible, reessayez plus tard',
+      );
     }
   }
 
@@ -260,6 +247,9 @@ export class UsersService {
   }
 
   async getFavoriteIds(deviceId: string | undefined): Promise<Set<string>> {
+    // Consultation anonyme : aucun favori, et surtout aucun compte cree.
+    if (!normalizeText(deviceId)) return new Set();
+
     const normalizedDeviceId = normalizeDeviceId(deviceId);
 
     try {
@@ -386,12 +376,6 @@ export class UsersService {
     return state;
   }
 
-  private findFallbackUserByEmail(email: string) {
-    return [...this.fallbackUsers.values()].find(
-      (user) => user.profile.email.toLowerCase() === email,
-    );
-  }
-
   private warnFallback(error: unknown) {
     this.logger.warn(`Database fallback active: ${errorMessage(error)}`);
   }
@@ -437,7 +421,11 @@ function toConcertSnapshot(
 
 function normalizeDeviceId(deviceId: string | undefined) {
   const normalized = normalizeText(deviceId);
-  if (!normalized) return 'livearound-demo-device';
+  if (!normalized) {
+    // Ne doit jamais arriver derriere SessionGuard : plus de compte de
+    // demonstration partage entre tous les clients sans identite.
+    throw new UnauthorizedException('Session requise');
+  }
   return normalized.replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 128);
 }
 

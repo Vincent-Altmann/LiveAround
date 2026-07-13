@@ -78,7 +78,18 @@ Pour lancer PostgreSQL/PostGIS localement :
 docker compose up -d
 ```
 
-L'API expose `POST /auth/register` et `POST /auth/login`, puis rattache les preferences et favoris a l'en-tete `x-livearound-device-id` renvoye a l'application mobile.
+L'API expose `POST /auth/register` et `POST /auth/login`, qui renvoient un jeton `accessToken` (JWT signe avec `JWT_SECRET`). Les endpoints compte, preferences, favoris et signalements exigent ce jeton dans l'en-tete `Authorization: Bearer <token>` ; la consultation des concerts reste publique.
+
+En developpement, si `JWT_SECRET` vaut `replace-me` ou est vide, un secret de developpement est utilise ; en production le demarrage echoue tant qu'un vrai secret n'est pas defini.
+
+## Mode demonstration
+
+Pour presenter l'application sans API ni base de donnees (donnees mock uniquement) :
+
+```bash
+cd apps/mobile
+flutter run --dart-define LIVEAROUND_DEMO_MODE=true
+```
 
 ## Statut actuel
 

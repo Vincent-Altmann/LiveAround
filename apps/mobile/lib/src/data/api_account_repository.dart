@@ -26,14 +26,20 @@ class ApiAccountRepository implements AccountRepository {
 
   @override
   Future<UserProfile?> restoreSession() async {
-    final deviceId = await _identityStore.readDeviceId();
-    if (deviceId == null || deviceId.isEmpty) return null;
+    final token = await _identityStore.readToken();
+    if (token == null || token.isEmpty) return null;
 
     try {
       final payload = await _getJson(_buildUri('/users/me'));
       return UserProfile.fromJson(payload as Map<String, dynamic>);
+    } on ApiRequestException catch (error) {
+      if (error.isClientError) {
+        // Jeton expire ou invalide : on force une nouvelle connexion.
+        await _identityStore.clearSession();
+      }
+      return null;
     } catch (_) {
-      return _fallbackRepository.restoreSession();
+      return null;
     }
   }
 
@@ -42,16 +48,19 @@ class ApiAccountRepository implements AccountRepository {
     required String email,
     required String password,
   }) async {
+    // Pas de repli mock ici : une connexion ne doit jamais "reussir" sur des
+    // donnees de demonstration quand le serveur est injoignable.
     try {
       final payload = await _postJson(
         _buildUri('/auth/login'),
         body: {'email': email.trim(), 'password': password},
-        includeDeviceId: false,
+        authenticated: false,
       );
       return _saveAuthSession(payload as Map<String, dynamic>);
-    } catch (error) {
-      if (error is ApiRequestException && error.isClientError) rethrow;
-      return _fallbackRepository.login(email: email, password: password);
+    } on ApiRequestException {
+      rethrow;
+    } catch (_) {
+      throw const ApiUnavailableException();
     }
   }
 
@@ -69,27 +78,20 @@ class ApiAccountRepository implements AccountRepository {
           'email': email.trim(),
           'password': password,
         },
-        includeDeviceId: false,
+        authenticated: false,
       );
       return _saveAuthSession(payload as Map<String, dynamic>);
-    } catch (error) {
-      if (error is ApiRequestException && error.isClientError) rethrow;
-      return _fallbackRepository.register(
-        displayName: displayName,
-        email: email,
-        password: password,
-      );
+    } on ApiRequestException {
+      rethrow;
+    } catch (_) {
+      throw const ApiUnavailableException();
     }
   }
 
   @override
   Future<UserProfile> loadProfile() async {
     try {
-      final deviceId = await _identityStore.getOrCreateDeviceId();
-      final payload = await _postJson(
-        _buildUri('/users/me'),
-        body: {'deviceId': deviceId},
-      );
+      final payload = await _getJson(_buildUri('/users/me'));
       return UserProfile.fromJson(payload as Map<String, dynamic>);
     } catch (_) {
       return _fallbackRepository.loadProfile();
@@ -102,11 +104,9 @@ class ApiAccountRepository implements AccountRepository {
     required String email,
   }) async {
     try {
-      final deviceId = await _identityStore.getOrCreateDeviceId();
       final payload = await _postJson(
         _buildUri('/users/me'),
         body: {
-          'deviceId': deviceId,
           'displayName': displayName,
           if (email.trim().isNotEmpty) 'email': email.trim(),
         },
@@ -157,7 +157,7 @@ class ApiAccountRepository implements AccountRepository {
 
   @override
   Future<void> signOut() async {
-    await _identityStore.clearDeviceId();
+    await _identityStore.clearSession();
     await _fallbackRepository.signOut();
   }
 
@@ -171,12 +171,14 @@ class ApiAccountRepository implements AccountRepository {
 
   Future<Map<String, String>> _headers({
     bool json = false,
-    bool includeDeviceId = true,
+    bool authenticated = true,
   }) async {
     final headers = <String, String>{};
-    if (includeDeviceId) {
-      headers['x-livearound-device-id'] =
-          await _identityStore.getOrCreateDeviceId();
+    if (authenticated) {
+      final token = await _identityStore.readToken();
+      if (token != null && token.isNotEmpty) {
+        headers['authorization'] = 'Bearer $token';
+      }
     }
     if (json) headers['content-type'] = 'application/json';
     return headers;
@@ -192,14 +194,14 @@ class ApiAccountRepository implements AccountRepository {
   Future<dynamic> _postJson(
     Uri uri, {
     Map<String, dynamic>? body,
-    bool includeDeviceId = true,
+    bool authenticated = true,
   }) async {
     final response = await _client
         .post(
           uri,
           headers: await _headers(
             json: body != null,
-            includeDeviceId: includeDeviceId,
+            authenticated: authenticated,
           ),
           body: body == null ? null : jsonEncode(body),
         )
@@ -229,8 +231,9 @@ class ApiAccountRepository implements AccountRepository {
 
   Future<UserProfile> _saveAuthSession(Map<String, dynamic> payload) async {
     final deviceId = payload['deviceId'] as String? ?? '';
-    if (deviceId.isNotEmpty) {
-      await _identityStore.saveDeviceId(deviceId);
+    final token = payload['accessToken'] as String? ?? '';
+    if (deviceId.isNotEmpty && token.isNotEmpty) {
+      await _identityStore.saveSession(deviceId: deviceId, token: token);
     }
 
     return UserProfile.fromJson(payload['profile'] as Map<String, dynamic>);
@@ -243,4 +246,9 @@ class ApiRequestException implements Exception {
   final int statusCode;
 
   bool get isClientError => statusCode >= 400 && statusCode < 500;
+}
+
+/// Serveur injoignable (reseau coupe, API arretee, timeout).
+class ApiUnavailableException implements Exception {
+  const ApiUnavailableException();
 }

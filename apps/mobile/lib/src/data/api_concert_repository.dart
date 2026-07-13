@@ -11,16 +11,16 @@ class ApiConcertRepository implements ConcertRepository {
   ApiConcertRepository({
     required String baseUrl,
     required ConcertRepository fallbackRepository,
-    DeviceIdProvider? deviceIdProvider,
+    TokenProvider? tokenProvider,
     http.Client? client,
   })  : _baseUri = Uri.parse(baseUrl),
         _fallbackRepository = fallbackRepository,
-        _deviceIdProvider = deviceIdProvider,
+        _tokenProvider = tokenProvider,
         _client = client ?? http.Client();
 
   final Uri _baseUri;
   final ConcertRepository _fallbackRepository;
-  final DeviceIdProvider? _deviceIdProvider;
+  final TokenProvider? _tokenProvider;
   final http.Client _client;
 
   @override
@@ -118,9 +118,9 @@ class ApiConcertRepository implements ConcertRepository {
 
   Future<Map<String, String>> _headers({bool json = false}) async {
     final headers = <String, String>{};
-    final deviceId = await _deviceIdProvider?.call();
-    if (deviceId != null && deviceId.isNotEmpty) {
-      headers['x-livearound-device-id'] = deviceId;
+    final token = await _tokenProvider?.call();
+    if (token != null && token.isNotEmpty) {
+      headers['authorization'] = 'Bearer $token';
     }
     if (json) headers['content-type'] = 'application/json';
     return headers;

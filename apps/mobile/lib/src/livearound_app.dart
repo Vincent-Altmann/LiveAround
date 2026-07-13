@@ -16,21 +16,36 @@ class LiveAroundApp extends StatelessWidget {
   factory LiveAroundApp({
     ConcertRepository? repository,
     AccountRepository? accountRepository,
-    DeviceIdProvider? deviceIdProvider,
+    TokenProvider? tokenProvider,
     UserLocationLoader? locationLoader,
     Key? key,
   }) {
     const identityStore = DeviceIdentityStore();
-    final resolvedDeviceIdProvider =
-        deviceIdProvider ?? identityStore.getOrCreateDeviceId;
     final fallbackConcertRepository = MockConcertRepository();
+
+    // Mode demonstration explicite : tout fonctionne sur des donnees mock,
+    // sans API. Active avec --dart-define LIVEAROUND_DEMO_MODE=true.
+    if (LiveAroundConfig.demoMode) {
+      return LiveAroundApp._(
+        repository: repository ?? fallbackConcertRepository,
+        accountRepository: accountRepository ??
+            MockAccountRepository(
+              concertRepository: fallbackConcertRepository,
+            ),
+        locationLoader:
+            locationLoader ?? const UserLocationService().determineLocation,
+        key: key,
+      );
+    }
+
+    final resolvedTokenProvider = tokenProvider ?? identityStore.readToken;
 
     return LiveAroundApp._(
       repository: repository ??
           ApiConcertRepository(
             baseUrl: LiveAroundConfig.apiBaseUrl,
             fallbackRepository: fallbackConcertRepository,
-            deviceIdProvider: resolvedDeviceIdProvider,
+            tokenProvider: resolvedTokenProvider,
           ),
       accountRepository: accountRepository ??
           ApiAccountRepository(
