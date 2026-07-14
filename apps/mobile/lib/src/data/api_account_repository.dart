@@ -124,6 +124,7 @@ class ApiAccountRepository implements AccountRepository {
   Future<UserProfile> updatePreferences({
     required Set<String> preferredGenres,
     required double preferredRadiusKm,
+    bool? notificationOptIn,
   }) async {
     try {
       final payload = await _patchJson(
@@ -131,6 +132,8 @@ class ApiAccountRepository implements AccountRepository {
         body: {
           'preferredGenres': preferredGenres.toList(),
           'preferredRadiusKm': preferredRadiusKm.round(),
+          if (notificationOptIn != null)
+            'notificationOptIn': notificationOptIn,
         },
       );
       return UserProfile.fromJson(payload as Map<String, dynamic>);
@@ -138,6 +141,7 @@ class ApiAccountRepository implements AccountRepository {
       return _fallbackRepository.updatePreferences(
         preferredGenres: preferredGenres,
         preferredRadiusKm: preferredRadiusKm,
+        notificationOptIn: notificationOptIn,
       );
     }
   }

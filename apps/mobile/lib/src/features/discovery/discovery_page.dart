@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../data/concert_repository.dart';
 import '../../data/user_location_service.dart';
 import '../../domain/concert.dart';
 import '../../domain/concert_filters.dart';
+import '../../domain/french_city.dart';
 import '../../domain/user_location.dart';
 import '../../theme/livearound_theme.dart';
 import '../concert/concert_detail_page.dart';
@@ -31,6 +34,7 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
   ConcertFilters _filters = const ConcertFilters();
   late Future<List<Concert>> _concertsFuture;
   var _isResolvingLocation = false;
+  Timer? _searchDebounce;
 
   static const List<String> _genres = [
     'Rock',
@@ -46,10 +50,16 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
     super.initState();
     _filters = _filters.copyWith(
       selectedGenres: widget.initialPreferredGenres,
-      radiusKm: widget.initialRadiusKm,
+      radiusKm: widget.initialRadiusKm?.clamp(5, 120),
     );
     _concertsFuture = widget.repository.findNearby(_filters);
     _resolveLocation();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
   }
 
   void _refresh() {
@@ -61,6 +71,28 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
   void _updateFilters(ConcertFilters filters) {
     _filters = filters;
     _refresh();
+  }
+
+  // Chaque frappe ne declenche pas d'appel : on attend une pause de 400 ms
+  // pour preserver le quota Ticketmaster (5 req/s, 5000 req/jour).
+  void _onQueryChanged(String value) {
+    _filters = _filters.copyWith(query: value);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) _refresh();
+    });
+  }
+
+  // Le slider met a jour l'affichage en continu mais ne recharge la liste
+  // qu'une fois le geste termine.
+  void _onRadiusChanged(double radius) {
+    setState(() {
+      _filters = _filters.copyWith(radiusKm: radius);
+    });
+  }
+
+  void _onRadiusChangeEnd(double radius) {
+    _updateFilters(_filters.copyWith(radiusKm: radius));
   }
 
   Future<void> _resolveLocation() async {
@@ -81,6 +113,100 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
       _isResolvingLocation = false;
       _concertsFuture = widget.repository.findNearby(_filters);
     });
+  }
+
+  Future<void> _chooseLocation() async {
+    final choice = await showModalBottomSheet<Object>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => const _CityPickerSheet(),
+    );
+    if (!mounted || choice == null) return;
+
+    if (choice == _CityPickerSheet.gpsChoice) {
+      await _resolveLocation();
+      return;
+    }
+
+    final city = choice as FrenchCity;
+    _updateFilters(
+      _filters.copyWith(
+        latitude: city.latitude,
+        longitude: city.longitude,
+        locationLabel: city.name,
+        usesFallbackLocation: false,
+      ),
+    );
+  }
+
+  Future<void> _applyDatePreset(_DatePreset preset) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    switch (preset) {
+      case _DatePreset.all:
+        _updateFilters(
+          _filters.copyWith(from: null, to: null, dateLabel: _DatePreset.all.label),
+        );
+      case _DatePreset.today:
+        _updateFilters(
+          _filters.copyWith(
+            from: now,
+            to: today.add(const Duration(days: 1)),
+            dateLabel: _DatePreset.today.label,
+          ),
+        );
+      case _DatePreset.weekend:
+        final range = _weekendRange(now);
+        _updateFilters(
+          _filters.copyWith(
+            from: range.$1,
+            to: range.$2,
+            dateLabel: _DatePreset.weekend.label,
+          ),
+        );
+      case _DatePreset.week:
+        _updateFilters(
+          _filters.copyWith(
+            from: now,
+            to: now.add(const Duration(days: 7)),
+            dateLabel: _DatePreset.week.label,
+          ),
+        );
+      case _DatePreset.custom:
+        final picked = await showDateRangePicker(
+          context: context,
+          firstDate: today,
+          lastDate: today.add(const Duration(days: 365)),
+          helpText: 'Periode des concerts',
+        );
+        if (picked == null) return;
+        _updateFilters(
+          _filters.copyWith(
+            from: picked.start,
+            to: picked.end.add(const Duration(days: 1)),
+            dateLabel:
+                '${_shortDate(picked.start)} - ${_shortDate(picked.end)}',
+          ),
+        );
+    }
+  }
+
+  // Week-end courant s'il est en cours, sinon le prochain.
+  (DateTime, DateTime) _weekendRange(DateTime now) {
+    final today = DateTime(now.year, now.month, now.day);
+    final DateTime saturday;
+    if (now.weekday == DateTime.saturday) {
+      saturday = today;
+    } else if (now.weekday == DateTime.sunday) {
+      saturday = today.subtract(const Duration(days: 1));
+    } else {
+      saturday = today.add(Duration(days: DateTime.saturday - now.weekday));
+    }
+
+    final from = saturday.isBefore(now) ? now : saturday;
+    final to = saturday.add(const Duration(days: 2));
+    return (from, to);
   }
 
   Future<void> _toggleFavorite(Concert concert) async {
@@ -111,7 +237,9 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Les alertes seront activees avec FCM.'),
+                  content: Text(
+                    'Activez les alertes depuis l\'onglet Profil. L\'envoi de notifications arrive avec FCM.',
+                  ),
                 ),
               );
             },
@@ -131,8 +259,9 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
                   child: _Header(
                     filters: _filters,
                     isResolvingLocation: _isResolvingLocation,
-                    onChanged: _updateFilters,
+                    onQueryChanged: _onQueryChanged,
                     onRefreshLocation: _resolveLocation,
+                    onChooseLocation: _chooseLocation,
                   ),
                 ),
                 SliverToBoxAdapter(
@@ -147,16 +276,26 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
                   ),
                 ),
                 SliverToBoxAdapter(
+                  child: _DateFilters(
+                    currentLabel: _filters.dateLabel,
+                    onSelected: _applyDatePreset,
+                  ),
+                ),
+                SliverToBoxAdapter(
                   child: _RadiusFilter(
                     radiusKm: _filters.radiusKm,
-                    onChanged: (radius) {
-                      _updateFilters(_filters.copyWith(radiusKm: radius));
-                    },
+                    onChanged: _onRadiusChanged,
+                    onChangeEnd: _onRadiusChangeEnd,
                   ),
                 ),
                 if (snapshot.connectionState == ConnectionState.waiting)
                   const SliverFillRemaining(
                     child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (snapshot.hasError)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _ErrorState(onRetry: _refresh),
                   )
                 else ...[
                   SliverToBoxAdapter(
@@ -218,18 +357,80 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
   }
 }
 
+String _shortDate(DateTime date) {
+  return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
+}
+
+enum _DatePreset {
+  all('Toutes les dates'),
+  today('Aujourd\'hui'),
+  weekend('Ce week-end'),
+  week('7 jours'),
+  custom('Choisir...');
+
+  const _DatePreset(this.label);
+
+  final String label;
+}
+
+class _DateFilters extends StatelessWidget {
+  const _DateFilters({
+    required this.currentLabel,
+    required this.onSelected,
+  });
+
+  final String currentLabel;
+  final ValueChanged<_DatePreset> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final isCustom = _DatePreset.values
+        .every((preset) => preset.label != currentLabel);
+
+    return SizedBox(
+      height: 48,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        scrollDirection: Axis.horizontal,
+        itemCount: _DatePreset.values.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final preset = _DatePreset.values[index];
+          final selected = preset == _DatePreset.custom
+              ? isCustom
+              : preset.label == currentLabel;
+          return FilterChip(
+            avatar: preset == _DatePreset.custom
+                ? const Icon(Icons.calendar_month_rounded, size: 18)
+                : null,
+            label: Text(
+              preset == _DatePreset.custom && isCustom
+                  ? currentLabel
+                  : preset.label,
+            ),
+            selected: selected,
+            onSelected: (_) => onSelected(preset),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _Header extends StatelessWidget {
   const _Header({
     required this.filters,
     required this.isResolvingLocation,
-    required this.onChanged,
+    required this.onQueryChanged,
     required this.onRefreshLocation,
+    required this.onChooseLocation,
   });
 
   final ConcertFilters filters;
   final bool isResolvingLocation;
-  final ValueChanged<ConcertFilters> onChanged;
+  final ValueChanged<String> onQueryChanged;
   final VoidCallback onRefreshLocation;
+  final VoidCallback onChooseLocation;
 
   @override
   Widget build(BuildContext context) {
@@ -249,27 +450,35 @@ class _Header extends StatelessWidget {
           Text(
             filters.usesFallbackLocation
                 ? 'Position par defaut : ${filters.locationLabel}'
-                : 'Position actuelle : ${filters.locationLabel}',
+                : 'Position : ${filters.locationLabel}',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Colors.black.withValues(alpha: 0.62),
                 ),
           ),
           const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: isResolvingLocation ? null : onRefreshLocation,
-              icon: isResolvingLocation
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.my_location_rounded),
-              label: Text(
-                isResolvingLocation ? 'Localisation...' : 'Actualiser',
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: isResolvingLocation ? null : onRefreshLocation,
+                icon: isResolvingLocation
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.my_location_rounded),
+                label: Text(
+                  isResolvingLocation ? 'Localisation...' : 'Ma position',
+                ),
               ),
-            ),
+              OutlinedButton.icon(
+                onPressed: isResolvingLocation ? null : onChooseLocation,
+                icon: const Icon(Icons.location_city_rounded),
+                label: const Text('Choisir une ville'),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           TextField(
@@ -277,10 +486,93 @@ class _Header extends StatelessWidget {
               prefixIcon: Icon(Icons.search_rounded),
               hintText: 'Artiste, salle ou ville',
             ),
-            onChanged: (value) => onChanged(filters.copyWith(query: value)),
+            onChanged: onQueryChanged,
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CityPickerSheet extends StatefulWidget {
+  const _CityPickerSheet();
+
+  /// Valeur sentinelle renvoyee quand l'utilisateur prefere le GPS.
+  static const gpsChoice = 'gps';
+
+  @override
+  State<_CityPickerSheet> createState() => _CityPickerSheetState();
+}
+
+class _CityPickerSheetState extends State<_CityPickerSheet> {
+  var _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedQuery = _query.trim().toLowerCase();
+    final cities = frenchCities
+        .where((city) => city.name.toLowerCase().contains(normalizedQuery))
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Ou chercher des concerts ?',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                autofocus: false,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search_rounded),
+                  hintText: 'Rechercher une ville',
+                ),
+                onChanged: (value) => setState(() => _query = value),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.my_location_rounded),
+                      title: const Text('Utiliser ma position (GPS)'),
+                      onTap: () => Navigator.of(context)
+                          .pop(_CityPickerSheet.gpsChoice),
+                    ),
+                    const Divider(height: 1),
+                    for (final city in cities)
+                      ListTile(
+                        leading: const Icon(Icons.location_city_rounded),
+                        title: Text(city.name),
+                        onTap: () => Navigator.of(context).pop(city),
+                      ),
+                    if (cities.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'Aucune ville trouvee. Essayez une grande ville proche de chez vous.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -324,10 +616,15 @@ class _GenreFilters extends StatelessWidget {
 }
 
 class _RadiusFilter extends StatelessWidget {
-  const _RadiusFilter({required this.radiusKm, required this.onChanged});
+  const _RadiusFilter({
+    required this.radiusKm,
+    required this.onChanged,
+    required this.onChangeEnd,
+  });
 
   final double radiusKm;
   final ValueChanged<double> onChanged;
+  final ValueChanged<double> onChangeEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -341,10 +638,11 @@ class _RadiusFilter extends StatelessWidget {
           Expanded(
             child: Slider(
               min: 5,
-              max: 80,
-              divisions: 15,
-              value: radiusKm,
+              max: 120,
+              divisions: 23,
+              value: radiusKm.clamp(5, 120).toDouble(),
               onChanged: onChanged,
+              onChangeEnd: onChangeEnd,
             ),
           ),
         ],
@@ -473,7 +771,9 @@ class ConcertCard extends StatelessWidget {
                         ),
                         _MetaPill(
                           icon: Icons.confirmation_number_outlined,
-                          label: 'des ${concert.priceFrom.round()} EUR',
+                          label: concert.priceFrom > 0
+                              ? 'des ${concert.priceFrom.round()} EUR'
+                              : 'Prix NC',
                         ),
                       ],
                     ),
@@ -537,6 +837,45 @@ class _MetaPill extends StatelessWidget {
   }
 }
 
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off_rounded, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              'Impossible de charger les concerts',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Verifiez votre connexion puis reessayez.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Reessayer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.filters});
 
@@ -560,7 +899,9 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Elargissez le rayon de ${filters.radiusKm.round()} km ou retirez un filtre.',
+              filters.hasDateRange
+                  ? 'Elargissez le rayon de ${filters.radiusKm.round()} km, changez de periode ou retirez un filtre.'
+                  : 'Elargissez le rayon de ${filters.radiusKm.round()} km ou retirez un filtre.',
               textAlign: TextAlign.center,
             ),
           ],

@@ -21,12 +21,19 @@ class UserLocationService {
       return UserLocation.lyonFallback;
     }
 
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.medium,
-        timeLimit: Duration(seconds: 8),
-      ),
-    );
+    // getCurrentPosition peut lever (timeout, service coupe en cours de
+    // route) : sans ce garde-fou, l'ecran restait bloque en chargement.
+    final Position position;
+    try {
+      position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+    } catch (_) {
+      return UserLocation.lyonFallback;
+    }
 
     if (!_isMetropolitanFrance(position.latitude, position.longitude)) {
       return UserLocation.lyonFallback;

@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsNumber,
   IsOptional,
   IsString,
@@ -27,4 +28,9 @@ export class UpdatePreferencesDto {
   @Min(1)
   @Max(200)
   preferredRadiusKm?: number;
+
+  // Consentement explicite aux alertes (cadrage : opt-in notifications).
+  @IsOptional()
+  @IsBoolean()
+  notificationOptIn?: boolean;
 }

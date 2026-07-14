@@ -25,6 +25,7 @@ export interface ConcertModel {
 }
 
 export interface ConcertReportModel {
+  id?: string;
   concertId: string;
   reason: string;
   createdAt: string;

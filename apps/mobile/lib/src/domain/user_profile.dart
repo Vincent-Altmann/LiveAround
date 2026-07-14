@@ -6,6 +6,7 @@ class UserProfile {
     required this.preferredGenres,
     required this.preferredRadiusKm,
     required this.favoritesCount,
+    this.notificationOptIn = false,
   });
 
   final String id;
@@ -14,6 +15,7 @@ class UserProfile {
   final Set<String> preferredGenres;
   final double preferredRadiusKm;
   final int favoritesCount;
+  final bool notificationOptIn;
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
@@ -26,6 +28,7 @@ class UserProfile {
               .toSet(),
       preferredRadiusKm: (json['preferredRadiusKm'] as num?)?.toDouble() ?? 25,
       favoritesCount: (json['favoritesCount'] as num?)?.toInt() ?? 0,
+      notificationOptIn: json['notificationOptIn'] as bool? ?? false,
     );
   }
 
@@ -35,6 +38,7 @@ class UserProfile {
     Set<String>? preferredGenres,
     double? preferredRadiusKm,
     int? favoritesCount,
+    bool? notificationOptIn,
   }) {
     return UserProfile(
       id: id,
@@ -43,6 +47,7 @@ class UserProfile {
       preferredGenres: preferredGenres ?? this.preferredGenres,
       preferredRadiusKm: preferredRadiusKm ?? this.preferredRadiusKm,
       favoritesCount: favoritesCount ?? this.favoritesCount,
+      notificationOptIn: notificationOptIn ?? this.notificationOptIn,
     );
   }
 

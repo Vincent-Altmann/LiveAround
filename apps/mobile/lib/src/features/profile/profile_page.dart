@@ -27,6 +27,7 @@ class _ProfilePageState extends State<ProfilePage> {
   late final TextEditingController _emailController;
   late Set<String> _selectedGenres;
   late double _radiusKm;
+  late bool _notificationOptIn;
   var _isSaving = false;
 
   static const List<String> _genres = [
@@ -47,6 +48,7 @@ class _ProfilePageState extends State<ProfilePage> {
     _emailController = TextEditingController(text: widget.initialProfile.email);
     _selectedGenres = widget.initialProfile.preferredGenres;
     _radiusKm = widget.initialProfile.preferredRadiusKm;
+    _notificationOptIn = widget.initialProfile.notificationOptIn;
   }
 
   @override
@@ -57,6 +59,7 @@ class _ProfilePageState extends State<ProfilePage> {
       _emailController.text = widget.initialProfile.email;
       _selectedGenres = widget.initialProfile.preferredGenres;
       _radiusKm = widget.initialProfile.preferredRadiusKm;
+      _notificationOptIn = widget.initialProfile.notificationOptIn;
     }
   }
 
@@ -80,6 +83,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final updated = await widget.accountRepository.updatePreferences(
         preferredGenres: _selectedGenres,
         preferredRadiusKm: _radiusKm,
+        notificationOptIn: _notificationOptIn,
       );
 
       if (!mounted) return;
@@ -175,6 +179,21 @@ class _ProfilePageState extends State<ProfilePage> {
                   _radiusKm = value;
                 });
               },
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              value: _notificationOptIn,
+              onChanged: (value) {
+                setState(() {
+                  _notificationOptIn = value;
+                });
+              },
+              secondary: const Icon(Icons.notifications_active_outlined),
+              title: const Text('Alertes concerts'),
+              subtitle: const Text(
+                'Etre prevenu des nouveaux concerts correspondant a vos genres et votre rayon.',
+              ),
+              contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 24),
             FilledButton.icon(

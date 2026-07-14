@@ -93,10 +93,12 @@ flutter run --dart-define LIVEAROUND_DEMO_MODE=true
 
 ## Statut actuel
 
-Premiere base de code initialisee avec :
+Base de code MVP avec :
 
-- application Flutter avec page Connexion/Creation, puis onglets Decouvrir, Favoris et Profil ;
-- API NestJS avec endpoints auth, concerts, compte utilisateur, preferences, favoris et signalements ;
-- integration Ticketmaster pour les vrais concerts ;
-- configuration Docker Compose PostGIS et migrations applicatives de developpement ;
+- application Flutter : connexion/creation de compte (session JWT), onglets Decouvrir, Favoris et Profil ;
+- recherche de concerts par position GPS ou ville choisie manuellement, filtres genre, distance et date (aujourd'hui, week-end, 7 jours, periode libre), carte interactive ;
+- fiche concert avec ouverture de la billetterie, favoris persistants, signalement d'une donnee incorrecte ;
+- preferences musicales, rayon favori et opt-in alertes dans le profil (l'envoi FCM reste a brancher) ;
+- API NestJS : auth JWT, concerts via Ticketmaster avec cache memoire (recherches 2 min, details 10 min), preferences, favoris, signalements persistes en base ;
+- configuration Docker Compose PostGIS, migrations applicatives de developpement, tests unitaires API et mobile executes par la CI ;
 - documentation d'architecture et de developpement.
