@@ -2,13 +2,15 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   NotFoundException,
   Param,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 
+import { SessionDeviceId } from '../auth/session-device-id.decorator';
+import { OptionalSessionGuard, SessionGuard } from '../auth/session.guard';
 import { ConcertsService } from './concerts.service';
 import { FindConcertsDto } from './dto/find-concerts.dto';
 import { ReportConcertDto } from './dto/report-concert.dto';
@@ -18,17 +20,19 @@ export class ConcertsController {
   constructor(private readonly concertsService: ConcertsService) {}
 
   @Get()
+  @UseGuards(OptionalSessionGuard)
   findNearby(
     @Query() query: FindConcertsDto,
-    @Headers('x-livearound-device-id') deviceId?: string,
+    @SessionDeviceId() deviceId?: string,
   ) {
     return this.concertsService.findNearby(query, deviceId);
   }
 
   @Get(':id')
+  @UseGuards(OptionalSessionGuard)
   async findOne(
     @Param('id') id: string,
-    @Headers('x-livearound-device-id') deviceId?: string,
+    @SessionDeviceId() deviceId?: string,
   ) {
     const concert = await this.concertsService.findOne(id, deviceId);
     if (!concert) {
@@ -38,18 +42,20 @@ export class ConcertsController {
   }
 
   @Post(':id/favorite')
+  @UseGuards(SessionGuard)
   async toggleFavorite(
     @Param('id') id: string,
-    @Headers('x-livearound-device-id') deviceId?: string,
+    @SessionDeviceId() deviceId: string,
   ) {
     return this.concertsService.toggleFavorite(id, deviceId);
   }
 
   @Post(':id/report')
+  @UseGuards(SessionGuard)
   async report(
     @Param('id') id: string,
     @Body() body: ReportConcertDto,
-    @Headers('x-livearound-device-id') deviceId?: string,
+    @SessionDeviceId() deviceId: string,
   ) {
     return this.concertsService.report(id, body.reason, deviceId);
   }

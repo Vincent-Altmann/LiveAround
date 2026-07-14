@@ -103,9 +103,11 @@ export class ConcertsService {
   }
 
   private async withUserPreferences(query: FindConcertsDto, deviceId?: string) {
-    const profile = await this.usersService.getOrCreateCurrentUser(deviceId);
-    if (query.genres.length > 0) return query;
+    // Sans session, la recherche reste anonyme : pas de preferences a
+    // appliquer et surtout pas de compte cree a la volee.
+    if (!deviceId || query.genres.length > 0) return query;
 
+    const profile = await this.usersService.getOrCreateCurrentUser(deviceId);
     return {
       ...query,
       genres: profile.preferredGenres,

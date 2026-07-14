@@ -135,7 +135,10 @@ export class TicketmasterClient {
   }
 
   private classificationName(genres: string[]) {
-    return genres.length > 0 ? genres.join(',') : 'music';
+    if (genres.length === 0) return 'music';
+    return genres
+      .map((genre) => GENRE_TO_TICKETMASTER[genre.toLowerCase()] ?? genre)
+      .join(',');
   }
 
   private async getJson<T>(url: URL): Promise<T> {
@@ -190,11 +193,12 @@ export class TicketmasterClient {
       artist:
         event._embedded?.attractions?.[0]?.name ?? event.name ?? 'Artiste',
       title: event.name ?? 'Concert',
-      genre:
+      genre: toDisplayGenre(
         event.classifications?.[0]?.genre?.name ??
-        event.classifications?.[0]?.subGenre?.name ??
-        event.classifications?.[0]?.segment?.name ??
-        'Musique',
+          event.classifications?.[0]?.subGenre?.name ??
+          event.classifications?.[0]?.segment?.name ??
+          'Musique',
+      ),
       startsAt,
       venue: {
         name: venue.name ?? 'Salle a confirmer',
@@ -214,6 +218,30 @@ export class TicketmasterClient {
       imageUrl: bestImageUrl(event),
     };
   }
+}
+
+// Les genres proposes dans l'application sont en francais, alors que le
+// parametre classificationName de l'API Discovery attend les classifications
+// anglaises de Ticketmaster. Sans cette table, "Electro" ou "Classique" ne
+// remontent aucun resultat.
+const GENRE_TO_TICKETMASTER: Record<string, string> = {
+  rock: 'Rock',
+  pop: 'Pop',
+  electro: 'Electronic',
+  jazz: 'Jazz',
+  rap: 'Hip-Hop/Rap',
+  classique: 'Classical',
+};
+
+const TICKETMASTER_TO_DISPLAY: Record<string, string> = {
+  electronic: 'Electro',
+  'dance/electronic': 'Electro',
+  'hip-hop/rap': 'Rap',
+  classical: 'Classique',
+};
+
+function toDisplayGenre(genre: string) {
+  return TICKETMASTER_TO_DISPLAY[genre.toLowerCase()] ?? genre;
 }
 
 function eventStartDate(event: TicketmasterEvent) {

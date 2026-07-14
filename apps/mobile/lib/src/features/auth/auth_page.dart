@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/account_repository.dart';
+import '../../data/api_account_repository.dart';
 import '../../domain/user_profile.dart';
 import '../../theme/livearound_theme.dart';
 
@@ -62,12 +63,10 @@ class _AuthPageState extends State<AuthPage> {
 
       if (!mounted) return;
       widget.onAuthenticated(profile);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = _mode == _AuthMode.login
-            ? 'Connexion impossible avec ces identifiants.'
-            : 'Creation du compte impossible.';
+        _errorMessage = _describeError(error);
       });
     } finally {
       if (mounted) {
@@ -76,6 +75,26 @@ class _AuthPageState extends State<AuthPage> {
         });
       }
     }
+  }
+
+  String _describeError(Object error) {
+    if (error is ApiUnavailableException) {
+      return 'Serveur injoignable. Verifiez votre connexion ou que l\'API est demarree.';
+    }
+    if (error is ApiRequestException) {
+      if (error.statusCode == 401) {
+        return 'Identifiants invalides.';
+      }
+      if (error.statusCode == 409) {
+        return 'Un compte existe deja avec cet e-mail.';
+      }
+      if (error.statusCode == 503) {
+        return 'Service temporairement indisponible. Reessayez plus tard.';
+      }
+    }
+    return _mode == _AuthMode.login
+        ? 'Connexion impossible avec ces identifiants.'
+        : 'Creation du compte impossible.';
   }
 
   @override

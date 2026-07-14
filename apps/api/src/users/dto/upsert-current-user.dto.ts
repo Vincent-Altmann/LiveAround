@@ -7,10 +7,13 @@ import {
 } from 'class-validator';
 
 export class UpsertCurrentUserDto {
+  // Conserve pour compatibilite avec d'anciens clients, mais ignore :
+  // l'identite provient desormais du jeton de session verifie.
+  @IsOptional()
   @IsString()
   @MinLength(8)
   @MaxLength(128)
-  deviceId!: string;
+  deviceId?: string;
 
   @IsOptional()
   @IsEmail()

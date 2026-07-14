@@ -1,43 +1,33 @@
-import 'dart:math';
-
 import 'package:shared_preferences/shared_preferences.dart';
 
-typedef DeviceIdProvider = Future<String> Function();
+typedef TokenProvider = Future<String?> Function();
 
+/// Conserve la session issue de l'API : le jeton d'acces signe (JWT) et
+/// l'identifiant de compte associe. L'identite n'est plus un simple
+/// device-id genere localement, elle provient toujours du login/register.
 class DeviceIdentityStore {
   const DeviceIdentityStore();
 
   static const _deviceIdKey = 'livearound.auth_session_device_id';
+  static const _tokenKey = 'livearound.auth_session_token';
 
-  Future<String?> readDeviceId() async {
+  Future<String?> readToken() async {
     final preferences = await SharedPreferences.getInstance();
-    return preferences.getString(_deviceIdKey);
+    return preferences.getString(_tokenKey);
   }
 
-  Future<void> saveDeviceId(String deviceId) async {
+  Future<void> saveSession({
+    required String deviceId,
+    required String token,
+  }) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_deviceIdKey, deviceId);
+    await preferences.setString(_tokenKey, token);
   }
 
-  Future<void> clearDeviceId() async {
+  Future<void> clearSession() async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_deviceIdKey);
-  }
-
-  Future<String> getOrCreateDeviceId() async {
-    final preferences = await SharedPreferences.getInstance();
-    final current = preferences.getString(_deviceIdKey);
-    if (current != null && current.isNotEmpty) return current;
-
-    final generated = _generateDeviceId();
-    await preferences.setString(_deviceIdKey, generated);
-    return generated;
-  }
-
-  String _generateDeviceId() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    final suffix = bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0'));
-    return 'mobile-${suffix.join()}';
+    await preferences.remove(_tokenKey);
   }
 }
