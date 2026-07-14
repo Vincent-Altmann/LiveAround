@@ -6,6 +6,7 @@ import '../../data/user_location_service.dart';
 import '../../domain/user_profile.dart';
 import '../discovery/discovery_page.dart';
 import '../favorites/favorites_page.dart';
+import '../notifications/notifications_page.dart';
 import '../profile/profile_page.dart';
 
 class HomeShell extends StatefulWidget {
@@ -56,6 +57,17 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
+  void _openNotifications() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => NotificationsPage(
+          accountRepository: widget.accountRepository,
+          concertRepository: widget.repository,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = _profile;
@@ -72,6 +84,7 @@ class _HomeShellState extends State<HomeShell> {
             locationLoader: widget.locationLoader,
             initialPreferredGenres: profile?.preferredGenres,
             initialRadiusKm: profile?.preferredRadiusKm,
+            onOpenNotifications: _openNotifications,
           ),
           FavoritesPage(
             key: ValueKey('favorites-$_favoritesRevision'),

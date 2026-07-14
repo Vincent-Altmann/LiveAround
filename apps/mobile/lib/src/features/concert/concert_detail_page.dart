@@ -161,8 +161,11 @@ class _HeroPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final imageUrl = concert.imageUrl;
+
     return Container(
       height: 180,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
         gradient: const LinearGradient(
@@ -172,7 +175,29 @@ class _HeroPanel extends StatelessWidget {
         ),
       ),
       child: Stack(
+        fit: StackFit.expand,
         children: [
+          // Image de l'artiste en fond quand Ticketmaster en fournit une,
+          // assombrie pour garder le texte lisible.
+          if (imageUrl != null && imageUrl.isNotEmpty)
+            Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          if (imageUrl != null && imageUrl.isNotEmpty)
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.10),
+                    Colors.black.withValues(alpha: 0.55),
+                  ],
+                ),
+              ),
+            ),
           Positioned(
             right: 24,
             top: 24,
