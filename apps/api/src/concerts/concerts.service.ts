@@ -3,6 +3,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { TtlCache } from '../common/ttl-cache';
 import { DatabaseService } from '../database/database.service';
 import { UsersService } from '../users/users.service';
+import { ConcertStore } from './concert-store.service';
 import { ConcertModel, ConcertReportModel } from './concert.model';
 import { FindConcertsDto } from './dto/find-concerts.dto';
 import { distanceKm } from './geo.util';
@@ -35,11 +36,22 @@ export class ConcertsService {
     private readonly ticketmasterClient: TicketmasterClient,
     private readonly usersService: UsersService,
     private readonly database: DatabaseService,
+    private readonly concertStore: ConcertStore,
   ) {}
 
   async findNearby(query: FindConcertsDto, deviceId?: string) {
     const favorites = await this.usersService.getFavoriteIds(deviceId);
     const effectiveQuery = await this.withUserPreferences(query, deviceId);
+
+    // La derniere position de recherche alimente les alertes personnalisees
+    // (concerts proches de l'utilisateur). Fire-and-forget : jamais bloquant.
+    if (deviceId) {
+      void this.usersService.updateLastLocation(
+        deviceId,
+        query.latitude,
+        query.longitude,
+      );
+    }
 
     if (this.ticketmasterClient.isEnabled()) {
       const cacheKey = searchCacheKey(effectiveQuery);
@@ -55,12 +67,27 @@ export class ConcertsService {
         concerts.forEach((concert) =>
           this.detailCache.set(concert.id, concert),
         );
+        // Alimente le cache persistant PostGIS sans ralentir la reponse.
+        void this.concertStore.ingest(concerts).catch(() => undefined);
         return withFavorites(concerts, favorites);
       } catch (error) {
         this.logger.warn(
-          `Ticketmaster indisponible, fallback mock active: ${errorMessage(error)}`,
+          `Ticketmaster indisponible, bascule sur le cache PostGIS: ${errorMessage(error)}`,
         );
       }
+    }
+
+    // Ticketmaster indisponible ou non configure : le cache persistant sert
+    // les concerts deja ingeres ; les donnees de demo restent l'ultime repli.
+    try {
+      const stored = await this.concertStore.searchNearby(effectiveQuery);
+      if (stored.length > 0) {
+        return withFavorites(stored, favorites);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Cache PostGIS indisponible: ${errorMessage(error)}`,
+      );
     }
 
     return withFavorites(this.findSeedNearby(effectiveQuery), favorites);

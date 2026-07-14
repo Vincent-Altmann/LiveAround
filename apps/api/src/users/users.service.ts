@@ -254,6 +254,36 @@ export class UsersService {
     }
   }
 
+  /**
+   * Memorise la derniere position de recherche : c'est elle qui sert de
+   * point de reference aux alertes personnalisees. Jamais bloquant.
+   */
+  async updateLastLocation(
+    deviceId: string | undefined,
+    latitude: number,
+    longitude: number,
+  ) {
+    const normalized = normalizeText(deviceId);
+    if (!normalized || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return;
+    }
+
+    try {
+      await this.database.query(
+        `
+          UPDATE users
+          SET
+            last_location = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
+            last_location_updated_at = now()
+          WHERE device_id = $1
+        `,
+        [normalizeDeviceId(normalized), longitude, latitude],
+      );
+    } catch {
+      // Base ou PostGIS indisponible : les alertes seront simplement muettes.
+    }
+  }
+
   async getFavoriteIds(deviceId: string | undefined): Promise<Set<string>> {
     // Consultation anonyme : aucun favori, et surtout aucun compte cree.
     if (!normalizeText(deviceId)) return new Set();

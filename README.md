@@ -97,8 +97,10 @@ Base de code MVP avec :
 
 - application Flutter : connexion/creation de compte (session JWT), onglets Decouvrir, Favoris et Profil ;
 - recherche de concerts par position GPS ou ville choisie manuellement, filtres genre, distance et date (aujourd'hui, week-end, 7 jours, periode libre), carte interactive ;
-- fiche concert avec ouverture de la billetterie, favoris persistants, signalement d'une donnee incorrecte ;
-- preferences musicales, rayon favori et opt-in alertes dans le profil (l'envoi FCM reste a brancher) ;
+- fiche concert avec image de l'artiste, ouverture de la billetterie, favoris persistants, signalement d'une donnee incorrecte ;
+- preferences musicales, rayon favori et opt-in alertes dans le profil ;
+- alertes personnalisees : les nouveaux concerts correspondant aux preferences (genres, rayon, derniere position) sont notifies in-app via la cloche de l'ecran Decouvrir, avec regle anti-spam (3/jour) et historisation des clics ; l'envoi push FCM est le dernier maillon a brancher (voir apps/api/src/notifications/push-sender.ts) ;
 - API NestJS : auth JWT, concerts via Ticketmaster avec cache memoire (recherches 2 min, details 10 min), preferences, favoris, signalements persistes en base ;
+- ingestion PostGIS : chaque recherche Ticketmaster alimente les tables venues/concerts ; si Ticketmaster est indisponible, l'API sert les concerts depuis ce cache persistant (tri par distance PostGIS), avec purge automatique des concerts passes ;
 - configuration Docker Compose PostGIS, migrations applicatives de developpement, tests unitaires API et mobile executes par la CI ;
 - documentation d'architecture et de developpement.
