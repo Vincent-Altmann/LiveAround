@@ -25,6 +25,15 @@ export class FindConcertsDto {
   @Max(200)
   radiusKm = 25;
 
+  // Ticketmaster limite la pagination profonde a 1000 elements
+  // (size 50 x 20 pages).
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  @Min(0)
+  @Max(19)
+  page = 0;
+
   @IsOptional()
   @Transform(({ value }) => {
     if (Array.isArray(value)) return value;

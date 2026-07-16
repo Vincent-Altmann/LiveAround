@@ -205,6 +205,9 @@ export class ConcertsService {
   }
 
   private findSeedNearby(query: FindConcertsDto) {
+    // Le jeu de demonstration tient sur une page.
+    if ((query.page ?? 0) > 0) return [];
+
     const normalizedQuery = query.query?.trim().toLowerCase();
     const from = query.from ? new Date(query.from) : null;
     const to = query.to ? new Date(query.to) : null;
@@ -249,6 +252,7 @@ function searchCacheKey(query: FindConcertsDto) {
     query.latitude.toFixed(2),
     query.longitude.toFixed(2),
     query.radiusKm,
+    query.page ?? 0,
     [...query.genres].sort().join('+'),
     query.from ?? '',
     query.to ?? '',

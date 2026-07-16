@@ -10,6 +10,15 @@ declare module 'pg' {
     rowCount: number;
   }
 
+  export interface PoolClient {
+    query<T extends object = Record<string, unknown>>(
+      text: string,
+      values?: readonly unknown[],
+    ): Promise<QueryResult<T>>;
+
+    release(): void;
+  }
+
   export class Pool {
     constructor(config?: PoolConfig);
 
@@ -17,6 +26,8 @@ declare module 'pg' {
       text: string,
       values?: readonly unknown[],
     ): Promise<QueryResult<T>>;
+
+    connect(): Promise<PoolClient>;
 
     end(): Promise<void>;
   }

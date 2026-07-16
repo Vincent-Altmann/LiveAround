@@ -190,6 +190,7 @@ export class ConcertStore implements OnModuleDestroy {
         WHERE ${conditions.join(' AND ')}
         ORDER BY distance_km ASC
         LIMIT 50
+        OFFSET ${(query.page ?? 0) * 50}
       `,
       values,
     );

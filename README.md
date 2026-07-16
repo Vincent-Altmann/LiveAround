@@ -78,9 +78,13 @@ Pour lancer PostgreSQL/PostGIS localement :
 docker compose up -d
 ```
 
-L'API expose `POST /auth/register` et `POST /auth/login`, qui renvoient un jeton `accessToken` (JWT signe avec `JWT_SECRET`). Les endpoints compte, preferences, favoris et signalements exigent ce jeton dans l'en-tete `Authorization: Bearer <token>` ; la consultation des concerts reste publique.
+L'API expose `POST /auth/register` et `POST /auth/login`, qui renvoient un `accessToken` (JWT 7 jours) et un `refreshToken` rotatif (90 jours, stocke hashe en base) a echanger via `POST /auth/refresh`. Les endpoints compte, preferences, favoris, alertes et signalements exigent le jeton d'acces dans l'en-tete `Authorization: Bearer <token>` ; la consultation des concerts reste publique.
 
-En developpement, si `JWT_SECRET` vaut `replace-me` ou est vide, un secret de developpement est utilise ; en production le demarrage echoue tant qu'un vrai secret n'est pas defini.
+Gestion du compte : `POST /auth/change-password`, `POST /auth/forgot-password` (code a 6 chiffres, 15 min — l'envoi par email reste a brancher, le code est trace dans les logs et renvoye en `devCode` hors production), `POST /auth/reset-password`, `DELETE /users/me` (suppression definitive confirmee par mot de passe).
+
+Securite : rate limiting global 100 req/min avec limite stricte 5 req/min sur les endpoints d'authentification, en-tetes helmet, CORS restreint par `CORS_ORIGINS` (ouvert en developpement uniquement). En developpement, si `JWT_SECRET` vaut `replace-me` ou est vide, un secret de developpement est utilise ; en production le demarrage echoue tant qu'un vrai secret n'est pas defini.
+
+Le schema de base de donnees est gere par des migrations versionnees (`apps/api/src/database/migrations.ts`, historisees dans `schema_migrations`). Les recherches de concerts sont paginees (`page`, 50 resultats par page) et l'application mobile charge les pages suivantes au fil du defilement.
 
 ## Mode demonstration
 
