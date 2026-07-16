@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../data/concert_repository.dart';
-import '../../data/user_location_service.dart';
 import '../../domain/concert.dart';
 import '../../domain/concert_filters.dart';
 import '../../domain/french_city.dart';
@@ -11,21 +10,18 @@ import '../../domain/user_location.dart';
 import '../../theme/livearound_theme.dart';
 import '../concert/concert_detail_page.dart';
 import '../map/concert_map.dart';
+import 'discovery_controller.dart';
 
 class DiscoveryPage extends StatefulWidget {
   const DiscoveryPage({
+    required this.controller,
     required this.repository,
-    required this.locationLoader,
-    this.initialPreferredGenres,
-    this.initialRadiusKm,
     this.onOpenNotifications,
     super.key,
   });
 
+  final DiscoveryController controller;
   final ConcertRepository repository;
-  final UserLocationLoader locationLoader;
-  final Set<String>? initialPreferredGenres;
-  final double? initialRadiusKm;
   final VoidCallback? onOpenNotifications;
 
   @override
@@ -33,9 +29,6 @@ class DiscoveryPage extends StatefulWidget {
 }
 
 class _DiscoveryPageState extends State<DiscoveryPage> {
-  ConcertFilters _filters = const ConcertFilters();
-  late Future<List<Concert>> _concertsFuture;
-  var _isResolvingLocation = false;
   Timer? _searchDebounce;
 
   static const List<String> _genres = [
@@ -47,15 +40,12 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
     'Classique',
   ];
 
+  DiscoveryController get _controller => widget.controller;
+
   @override
   void initState() {
     super.initState();
-    _filters = _filters.copyWith(
-      selectedGenres: widget.initialPreferredGenres,
-      radiusKm: widget.initialRadiusKm?.clamp(5, 120),
-    );
-    _concertsFuture = widget.repository.findNearby(_filters);
-    _resolveLocation();
+    unawaited(_controller.initialize());
   }
 
   @override
@@ -64,56 +54,13 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
     super.dispose();
   }
 
-  void _refresh() {
-    setState(() {
-      _concertsFuture = widget.repository.findNearby(_filters);
-    });
-  }
-
-  void _updateFilters(ConcertFilters filters) {
-    _filters = filters;
-    _refresh();
-  }
-
   // Chaque frappe ne declenche pas d'appel : on attend une pause de 400 ms
   // pour preserver le quota Ticketmaster (5 req/s, 5000 req/jour).
   void _onQueryChanged(String value) {
-    _filters = _filters.copyWith(query: value);
+    _controller.setQuery(value);
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 400), () {
-      if (mounted) _refresh();
-    });
-  }
-
-  // Le slider met a jour l'affichage en continu mais ne recharge la liste
-  // qu'une fois le geste termine.
-  void _onRadiusChanged(double radius) {
-    setState(() {
-      _filters = _filters.copyWith(radiusKm: radius);
-    });
-  }
-
-  void _onRadiusChangeEnd(double radius) {
-    _updateFilters(_filters.copyWith(radiusKm: radius));
-  }
-
-  Future<void> _resolveLocation() async {
-    setState(() {
-      _isResolvingLocation = true;
-    });
-
-    final location = await widget.locationLoader();
-    if (!mounted) return;
-
-    _filters = _filters.copyWith(
-      latitude: location.latitude,
-      longitude: location.longitude,
-      locationLabel: location.label,
-      usesFallbackLocation: location.isFallback,
-    );
-    setState(() {
-      _isResolvingLocation = false;
-      _concertsFuture = widget.repository.findNearby(_filters);
+      if (mounted) unawaited(_controller.refresh());
     });
   }
 
@@ -126,33 +73,31 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
     if (!mounted || choice == null) return;
 
     if (choice == _CityPickerSheet.gpsChoice) {
-      await _resolveLocation();
+      await _controller.resolveLocation();
       return;
     }
 
     final city = choice as FrenchCity;
-    _updateFilters(
-      _filters.copyWith(
-        latitude: city.latitude,
-        longitude: city.longitude,
-        locationLabel: city.name,
-        usesFallbackLocation: false,
-      ),
+    _controller.setManualLocation(
+      latitude: city.latitude,
+      longitude: city.longitude,
+      label: city.name,
     );
   }
 
   Future<void> _applyDatePreset(_DatePreset preset) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final filters = _controller.filters;
 
     switch (preset) {
       case _DatePreset.all:
-        _updateFilters(
-          _filters.copyWith(from: null, to: null, dateLabel: _DatePreset.all.label),
+        _controller.updateFilters(
+          filters.copyWith(from: null, to: null, dateLabel: _DatePreset.all.label),
         );
       case _DatePreset.today:
-        _updateFilters(
-          _filters.copyWith(
+        _controller.updateFilters(
+          filters.copyWith(
             from: now,
             to: today.add(const Duration(days: 1)),
             dateLabel: _DatePreset.today.label,
@@ -160,16 +105,16 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
         );
       case _DatePreset.weekend:
         final range = _weekendRange(now);
-        _updateFilters(
-          _filters.copyWith(
+        _controller.updateFilters(
+          filters.copyWith(
             from: range.$1,
             to: range.$2,
             dateLabel: _DatePreset.weekend.label,
           ),
         );
       case _DatePreset.week:
-        _updateFilters(
-          _filters.copyWith(
+        _controller.updateFilters(
+          filters.copyWith(
             from: now,
             to: now.add(const Duration(days: 7)),
             dateLabel: _DatePreset.week.label,
@@ -183,8 +128,8 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
           helpText: 'Periode des concerts',
         );
         if (picked == null) return;
-        _updateFilters(
-          _filters.copyWith(
+        _controller.updateFilters(
+          filters.copyWith(
             from: picked.start,
             to: picked.end.add(const Duration(days: 1)),
             dateLabel:
@@ -211,11 +156,6 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
     return (from, to);
   }
 
-  Future<void> _toggleFavorite(Concert concert) async {
-    await widget.repository.toggleFavorite(concert.id);
-    _refresh();
-  }
-
   Future<void> _openDetail(Concert concert) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -225,7 +165,19 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
         ),
       ),
     );
-    _refresh();
+    // Resynchronise uniquement le concert consulte (favori bascule sur la
+    // fiche, par exemple) au lieu de recharger toute la liste.
+    unawaited(_controller.syncConcert(concert.id));
+  }
+
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    final remaining =
+        notification.metrics.maxScrollExtent - notification.metrics.pixels;
+    if (remaining < 600) {
+      unawaited(_controller.loadMore());
+    }
+    return false;
   }
 
   @override
@@ -242,107 +194,138 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
         ],
       ),
       body: SafeArea(
-        child: FutureBuilder<List<Concert>>(
-          future: _concertsFuture,
-          builder: (context, snapshot) {
-            final concerts = snapshot.data ?? const <Concert>[];
+        child: ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) {
+            final filters = _controller.filters;
+            final concerts = _controller.concerts;
 
-            return CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _Header(
-                    filters: _filters,
-                    isResolvingLocation: _isResolvingLocation,
-                    onQueryChanged: _onQueryChanged,
-                    onRefreshLocation: _resolveLocation,
-                    onChooseLocation: _chooseLocation,
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _GenreFilters(
-                    genres: _genres,
-                    selectedGenres: _filters.selectedGenres,
-                    onChanged: (genres) {
-                      _updateFilters(
-                        _filters.copyWith(selectedGenres: genres),
-                      );
-                    },
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _DateFilters(
-                    currentLabel: _filters.dateLabel,
-                    onSelected: _applyDatePreset,
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _RadiusFilter(
-                    radiusKm: _filters.radiusKm,
-                    onChanged: _onRadiusChanged,
-                    onChangeEnd: _onRadiusChangeEnd,
-                  ),
-                ),
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (snapshot.hasError)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _ErrorState(onRetry: _refresh),
-                  )
-                else ...[
+            return NotificationListener<ScrollNotification>(
+              onNotification: _onScrollNotification,
+              child: CustomScrollView(
+                slivers: [
                   SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                      child: ConcertMap(
-                        concerts: concerts,
-                        userLocation: UserLocation(
-                          latitude: _filters.latitude,
-                          longitude: _filters.longitude,
-                          label: _filters.locationLabel,
-                          isFallback: _filters.usesFallbackLocation,
-                        ),
-                        onConcertTap: _openDetail,
-                      ),
+                    child: _Header(
+                      filters: filters,
+                      isResolvingLocation: _controller.isResolvingLocation,
+                      onQueryChanged: _onQueryChanged,
+                      onRefreshLocation: () =>
+                          unawaited(_controller.resolveLocation()),
+                      onChooseLocation: _chooseLocation,
                     ),
                   ),
-                  if (concerts.isEmpty)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _EmptyState(filters: _filters),
-                    )
-                  else ...[
-                    SliverToBoxAdapter(
-                      child: _ResultsSummary(
-                        count: concerts.length,
-                        onlyFavorites: _filters.onlyFavorites,
-                        onFavoriteFilterChanged: (enabled) {
-                          _updateFilters(
-                            _filters.copyWith(onlyFavorites: enabled),
-                          );
-                        },
-                      ),
-                    ),
-                    SliverList.separated(
-                      itemCount: concerts.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final concert = concerts[index];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: ConcertCard(
-                            concert: concert,
-                            onTap: () => _openDetail(concert),
-                            onFavoriteTap: () => _toggleFavorite(concert),
-                          ),
+                  SliverToBoxAdapter(
+                    child: _GenreFilters(
+                      genres: _genres,
+                      selectedGenres: filters.selectedGenres,
+                      onChanged: (genres) {
+                        _controller.updateFilters(
+                          filters.copyWith(selectedGenres: genres),
                         );
                       },
                     ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _DateFilters(
+                      currentLabel: filters.dateLabel,
+                      onSelected: _applyDatePreset,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _RadiusFilter(
+                      radiusKm: filters.radiusKm,
+                      onChanged: _controller.previewRadius,
+                      onChangeEnd: (radius) {
+                        _controller.updateFilters(
+                          _controller.filters.copyWith(radiusKm: radius),
+                        );
+                      },
+                    ),
+                  ),
+                  if (_controller.isLoading)
+                    const SliverFillRemaining(
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (_controller.hasError)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _ErrorState(
+                        onRetry: () => unawaited(_controller.refresh()),
+                      ),
+                    )
+                  else ...[
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                        child: ConcertMap(
+                          concerts: concerts,
+                          userLocation: UserLocation(
+                            latitude: filters.latitude,
+                            longitude: filters.longitude,
+                            label: filters.locationLabel,
+                            isFallback: filters.usesFallbackLocation,
+                          ),
+                          onConcertTap: _openDetail,
+                        ),
+                      ),
+                    ),
+                    if (concerts.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _EmptyState(filters: filters),
+                      )
+                    else ...[
+                      SliverToBoxAdapter(
+                        child: _ResultsSummary(
+                          count: concerts.length,
+                          hasMore: _controller.hasMore,
+                          onlyFavorites: filters.onlyFavorites,
+                          onFavoriteFilterChanged: (enabled) {
+                            _controller.updateFilters(
+                              filters.copyWith(onlyFavorites: enabled),
+                            );
+                          },
+                        ),
+                      ),
+                      SliverList.separated(
+                        itemCount: concerts.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final concert = concerts[index];
+                          return Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            child: ConcertCard(
+                              concert: concert,
+                              onTap: () => _openDetail(concert),
+                              onFavoriteTap: () => unawaited(
+                                _controller.toggleFavorite(concert.id),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      if (_controller.isLoadingMore)
+                        const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                    ],
                   ],
                 ],
-              ],
+              ),
             );
           },
         ),
@@ -648,11 +631,13 @@ class _RadiusFilter extends StatelessWidget {
 class _ResultsSummary extends StatelessWidget {
   const _ResultsSummary({
     required this.count,
+    required this.hasMore,
     required this.onlyFavorites,
     required this.onFavoriteFilterChanged,
   });
 
   final int count;
+  final bool hasMore;
   final bool onlyFavorites;
   final ValueChanged<bool> onFavoriteFilterChanged;
 
@@ -664,7 +649,7 @@ class _ResultsSummary extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              '$count concerts trouves',
+              hasMore ? '$count concerts et plus' : '$count concerts trouves',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),

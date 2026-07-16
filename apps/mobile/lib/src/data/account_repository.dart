@@ -35,5 +35,23 @@ abstract interface class AccountRepository {
 
   Future<void> markNotificationClicked(String notificationId);
 
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
+
+  /// Demande un code de reinitialisation. Renvoie le code en environnement
+  /// de developpement (l'envoi par email reste a brancher cote API).
+  Future<String?> requestPasswordReset({required String email});
+
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  });
+
+  /// Suppression definitive du compte (RGPD), confirmee par mot de passe.
+  Future<void> deleteAccount({required String password});
+
   Future<void> signOut();
 }

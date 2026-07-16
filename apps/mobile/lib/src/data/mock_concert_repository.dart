@@ -11,8 +11,11 @@ class MockConcertRepository implements ConcertRepository {
   final Map<String, Concert> _concerts;
 
   @override
-  Future<List<Concert>> findNearby(ConcertFilters filters) async {
+  Future<List<Concert>> findNearby(ConcertFilters filters, {int page = 0}) async {
     await Future<void>.delayed(const Duration(milliseconds: 250));
+
+    // Le jeu de demonstration tient sur une seule page.
+    if (page > 0) return const [];
 
     final normalizedQuery = filters.query.trim().toLowerCase();
     final results = _concerts.values.where((concert) {

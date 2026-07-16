@@ -4,6 +4,7 @@ import '../../data/account_repository.dart';
 import '../../data/concert_repository.dart';
 import '../../data/user_location_service.dart';
 import '../../domain/user_profile.dart';
+import '../discovery/discovery_controller.dart';
 import '../discovery/discovery_page.dart';
 import '../favorites/favorites_page.dart';
 import '../notifications/notifications_page.dart';
@@ -32,29 +33,51 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   var _selectedIndex = 0;
   UserProfile? _profile;
-  var _discoveryRevision = 0;
-  var _favoritesRevision = 0;
+  late final DiscoveryController _discoveryController;
+
+  // Incremente a chaque retour sur l'onglet Favoris pour recharger la liste
+  // sans reconstruire la page entiere.
+  final _favoritesRefresh = ValueNotifier<int>(0);
+
   late Future<UserProfile> _profileFuture;
 
   @override
   void initState() {
     super.initState();
     _profile = widget.initialProfile;
+    _discoveryController = DiscoveryController(
+      repository: widget.repository,
+      locationLoader: widget.locationLoader,
+    );
+    _discoveryController.applyPreferences(
+      genres: widget.initialProfile.preferredGenres,
+      radiusKm: widget.initialProfile.preferredRadiusKm,
+    );
+
     _profileFuture = widget.accountRepository.loadProfile();
     _profileFuture.then((profile) {
       if (!mounted) return;
-      setState(() {
-        _profile = profile;
-        _discoveryRevision++;
-      });
+      _handleProfileChanged(profile);
     });
+  }
+
+  @override
+  void dispose() {
+    _discoveryController.dispose();
+    _favoritesRefresh.dispose();
+    super.dispose();
   }
 
   void _handleProfileChanged(UserProfile profile) {
     setState(() {
       _profile = profile;
-      _discoveryRevision++;
     });
+    // Les preferences s'appliquent a l'ecran Decouvrir via le controleur,
+    // sans reconstruire la page (fin du hack a base de ValueKey).
+    _discoveryController.applyPreferences(
+      genres: profile.preferredGenres,
+      radiusKm: profile.preferredRadiusKm,
+    );
   }
 
   void _openNotifications() {
@@ -70,26 +93,19 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final profile = _profile;
-
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
         children: [
           DiscoveryPage(
-            key: ValueKey(
-              'discovery-${profile?.preferredRadiusKm}-${profile?.preferredGenres.join(',')}-$_discoveryRevision',
-            ),
+            controller: _discoveryController,
             repository: widget.repository,
-            locationLoader: widget.locationLoader,
-            initialPreferredGenres: profile?.preferredGenres,
-            initialRadiusKm: profile?.preferredRadiusKm,
             onOpenNotifications: _openNotifications,
           ),
           FavoritesPage(
-            key: ValueKey('favorites-$_favoritesRevision'),
             accountRepository: widget.accountRepository,
             concertRepository: widget.repository,
+            refreshTrigger: _favoritesRefresh,
           ),
           FutureBuilder<UserProfile>(
             future: _profileFuture,
@@ -109,8 +125,8 @@ class _HomeShellState extends State<HomeShell> {
         onDestinationSelected: (index) {
           setState(() {
             _selectedIndex = index;
-            if (index == 1) _favoritesRevision++;
           });
+          if (index == 1) _favoritesRefresh.value++;
         },
         destinations: const [
           NavigationDestination(

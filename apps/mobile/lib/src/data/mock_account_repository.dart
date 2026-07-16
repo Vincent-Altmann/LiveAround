@@ -122,6 +122,48 @@ class MockAccountRepository implements AccountRepository {
   Future<void> markNotificationClicked(String notificationId) async {}
 
   @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (_password != null && _password != currentPassword) {
+      throw StateError('Mot de passe actuel invalide');
+    }
+    _password = newPassword;
+  }
+
+  @override
+  Future<String?> requestPasswordReset({required String email}) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    return '123456';
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (code != '123456') {
+      throw StateError('Code invalide ou expire');
+    }
+    _password = newPassword;
+  }
+
+  @override
+  Future<void> deleteAccount({required String password}) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (_password != null && _password != password) {
+      throw StateError('Mot de passe invalide');
+    }
+    _profile = UserProfile.demo;
+    _password = null;
+    _isAuthenticated = false;
+  }
+
+  @override
   Future<void> signOut() async {
     _isAuthenticated = false;
   }

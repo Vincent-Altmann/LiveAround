@@ -15,6 +15,7 @@ class ApiAccountRepository implements AccountRepository {
     required DeviceIdentityStore identityStore,
     AccountRepository? fallbackRepository,
     http.Client? client,
+    this.onSessionExpired,
   })  : _baseUri = Uri.parse(baseUrl),
         _identityStore = identityStore,
         _fallbackRepository = fallbackRepository ?? MockAccountRepository(),
@@ -25,6 +26,12 @@ class ApiAccountRepository implements AccountRepository {
   final AccountRepository _fallbackRepository;
   final http.Client _client;
 
+  /// Appele quand la session est irrecuperable (jeton et refresh expires) :
+  /// l'application doit revenir a l'ecran de connexion.
+  final void Function()? onSessionExpired;
+
+  Future<bool>? _refreshInFlight;
+
   @override
   Future<UserProfile?> restoreSession() async {
     final token = await _identityStore.readToken();
@@ -33,11 +40,8 @@ class ApiAccountRepository implements AccountRepository {
     try {
       final payload = await _getJson(_buildUri('/users/me'));
       return UserProfile.fromJson(payload as Map<String, dynamic>);
-    } on ApiRequestException catch (error) {
-      if (error.isClientError) {
-        // Jeton expire ou invalide : on force une nouvelle connexion.
-        await _identityStore.clearSession();
-      }
+    } on ApiRequestException {
+      // 401 apres tentative de refresh : session invalide, deja nettoyee.
       return null;
     } catch (_) {
       return null;
@@ -184,6 +188,84 @@ class ApiAccountRepository implements AccountRepository {
   }
 
   @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final payload = await _postJson(
+        _buildUri('/auth/change-password'),
+        body: {
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        },
+      );
+      // L'API revoque toutes les sessions et en emet une nouvelle pour cet
+      // appareil : on la memorise pour rester connecte.
+      await _saveAuthSession(payload as Map<String, dynamic>);
+    } on ApiRequestException {
+      rethrow;
+    } catch (_) {
+      throw const ApiUnavailableException();
+    }
+  }
+
+  @override
+  Future<String?> requestPasswordReset({required String email}) async {
+    try {
+      final payload = await _postJson(
+        _buildUri('/auth/forgot-password'),
+        body: {'email': email.trim()},
+        authenticated: false,
+      );
+      return (payload as Map<String, dynamic>)['devCode'] as String?;
+    } on ApiRequestException {
+      rethrow;
+    } catch (_) {
+      throw const ApiUnavailableException();
+    }
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _postJson(
+        _buildUri('/auth/reset-password'),
+        body: {
+          'email': email.trim(),
+          'code': code.trim(),
+          'newPassword': newPassword,
+        },
+        authenticated: false,
+      );
+    } on ApiRequestException {
+      rethrow;
+    } catch (_) {
+      throw const ApiUnavailableException();
+    }
+  }
+
+  @override
+  Future<void> deleteAccount({required String password}) async {
+    try {
+      await _sendJson(
+        'DELETE',
+        _buildUri('/users/me'),
+        body: {'password': password},
+      );
+      await _identityStore.clearSession();
+    } on ApiRequestException {
+      rethrow;
+    } catch (_) {
+      throw const ApiUnavailableException();
+    }
+  }
+
+  @override
   Future<void> signOut() async {
     await _identityStore.clearSession();
     await _fallbackRepository.signOut();
@@ -212,41 +294,111 @@ class ApiAccountRepository implements AccountRepository {
     return headers;
   }
 
-  Future<dynamic> _getJson(Uri uri) async {
-    final response = await _client
-        .get(uri, headers: await _headers())
-        .timeout(const Duration(seconds: 4));
-    return _decode(response);
+  Future<dynamic> _getJson(Uri uri) {
+    return _sendJson('GET', uri);
   }
 
   Future<dynamic> _postJson(
     Uri uri, {
     Map<String, dynamic>? body,
     bool authenticated = true,
+  }) {
+    return _sendJson('POST', uri, body: body, authenticated: authenticated);
+  }
+
+  Future<dynamic> _patchJson(Uri uri, {required Map<String, dynamic> body}) {
+    return _sendJson('PATCH', uri, body: body);
+  }
+
+  /// Toutes les requetes passent ici : sur un 401 authentifie, une tentative
+  /// de renouvellement (refresh token) est faite puis la requete rejouee.
+  /// Si la session reste invalide, elle est purgee et l'application est
+  /// prevenue via [onSessionExpired].
+  Future<dynamic> _sendJson(
+    String method,
+    Uri uri, {
+    Map<String, dynamic>? body,
+    bool authenticated = true,
   }) async {
-    final response = await _client
-        .post(
+    var response = await _sendOnce(
+      method,
+      uri,
+      body: body,
+      authenticated: authenticated,
+    );
+
+    if (authenticated && response.statusCode == 401) {
+      if (await _refreshSession()) {
+        response = await _sendOnce(
+          method,
           uri,
-          headers: await _headers(
-            json: body != null,
-            authenticated: authenticated,
-          ),
-          body: body == null ? null : jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 4));
+          body: body,
+          authenticated: authenticated,
+        );
+      }
+
+      if (response.statusCode == 401) {
+        await _identityStore.clearSession();
+        onSessionExpired?.call();
+      }
+    }
+
     return _decode(response);
   }
 
-  Future<dynamic> _patchJson(Uri uri,
-      {required Map<String, dynamic> body}) async {
-    final response = await _client
-        .patch(
-          uri,
-          headers: await _headers(json: true),
-          body: jsonEncode(body),
-        )
+  Future<http.Response> _sendOnce(
+    String method,
+    Uri uri, {
+    Map<String, dynamic>? body,
+    bool authenticated = true,
+  }) async {
+    final request = http.Request(method, uri);
+    request.headers.addAll(
+      await _headers(json: body != null, authenticated: authenticated),
+    );
+    if (body != null) request.body = jsonEncode(body);
+
+    final streamed = await _client
+        .send(request)
         .timeout(const Duration(seconds: 4));
-    return _decode(response);
+    return http.Response.fromStream(streamed);
+  }
+
+  /// Renouvelle la session via le refresh token, en garantissant une seule
+  /// tentative simultanee (les appels concurrents partagent le resultat).
+  Future<bool> _refreshSession() {
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) return inFlight;
+
+    final attempt = _doRefresh().whenComplete(() {
+      _refreshInFlight = null;
+    });
+    _refreshInFlight = attempt;
+    return attempt;
+  }
+
+  Future<bool> _doRefresh() async {
+    final refreshToken = await _identityStore.readRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) return false;
+
+    try {
+      final response = await _sendOnce(
+        'POST',
+        _buildUri('/auth/refresh'),
+        body: {'refreshToken': refreshToken},
+        authenticated: false,
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return false;
+      }
+
+      await _saveAuthSession(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   dynamic _decode(http.Response response) {
@@ -261,7 +413,11 @@ class ApiAccountRepository implements AccountRepository {
     final deviceId = payload['deviceId'] as String? ?? '';
     final token = payload['accessToken'] as String? ?? '';
     if (deviceId.isNotEmpty && token.isNotEmpty) {
-      await _identityStore.saveSession(deviceId: deviceId, token: token);
+      await _identityStore.saveSession(
+        deviceId: deviceId,
+        token: token,
+        refreshToken: payload['refreshToken'] as String?,
+      );
     }
 
     return UserProfile.fromJson(payload['profile'] as Map<String, dynamic>);

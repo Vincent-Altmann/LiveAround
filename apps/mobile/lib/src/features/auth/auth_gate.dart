@@ -12,12 +12,17 @@ class AuthGate extends StatefulWidget {
     required this.repository,
     required this.accountRepository,
     required this.locationLoader,
+    this.sessionExpired,
     super.key,
   });
 
   final ConcertRepository repository;
   final AccountRepository accountRepository;
   final UserLocationLoader locationLoader;
+
+  /// Notifie quand la session est irrecuperable (jeton et refresh expires) :
+  /// l'application revient a l'ecran de connexion.
+  final Listenable? sessionExpired;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -31,6 +36,26 @@ class _AuthGateState extends State<AuthGate> {
   void initState() {
     super.initState();
     _sessionFuture = widget.accountRepository.restoreSession();
+    widget.sessionExpired?.addListener(_onSessionExpired);
+  }
+
+  @override
+  void dispose() {
+    widget.sessionExpired?.removeListener(_onSessionExpired);
+    super.dispose();
+  }
+
+  void _onSessionExpired() {
+    if (!mounted || _profile == null) return;
+    setState(() {
+      _profile = null;
+      _sessionFuture = Future<UserProfile?>.value(null);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Session expiree, reconnectez-vous.'),
+      ),
+    );
   }
 
   void _handleAuthenticated(UserProfile profile) {
