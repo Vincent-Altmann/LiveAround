@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../domain/app_notification.dart';
 import '../domain/concert.dart';
 import '../domain/user_profile.dart';
 import 'account_repository.dart';
@@ -156,6 +157,29 @@ class ApiAccountRepository implements AccountRepository {
           .toList();
     } catch (_) {
       return _fallbackRepository.findFavorites();
+    }
+  }
+
+  @override
+  Future<List<AppNotification>> findNotifications() async {
+    try {
+      final payload = await _getJson(_buildUri('/users/me/notifications'));
+      return (payload as List<dynamic>)
+          .map((item) => AppNotification.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return _fallbackRepository.findNotifications();
+    }
+  }
+
+  @override
+  Future<void> markNotificationClicked(String notificationId) async {
+    try {
+      await _postJson(
+        _buildUri('/users/me/notifications/$notificationId/click'),
+      );
+    } catch (_) {
+      // Le clic sert a la mesure de pertinence : ne jamais bloquer l'ouverture.
     }
   }
 

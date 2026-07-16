@@ -1,3 +1,4 @@
+import '../domain/app_notification.dart';
 import '../domain/concert.dart';
 import '../domain/concert_filters.dart';
 import '../domain/user_profile.dart';
@@ -99,6 +100,26 @@ class MockAccountRepository implements AccountRepository {
     );
     return concerts.where((concert) => concert.isFavorite).toList();
   }
+
+  @override
+  Future<List<AppNotification>> findNotifications() async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!_profile.notificationOptIn) return const [];
+
+    // Une alerte de demonstration pour visualiser le centre de notifications.
+    return [
+      AppNotification(
+        id: 'demo-notification',
+        concertId: 'la-002',
+        title: 'Nouveau concert Pop a 6 km',
+        body: 'Nora Blue — Radiant-Bellevue, Caluire-et-Cuire, le 27 juillet',
+        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+      ),
+    ];
+  }
+
+  @override
+  Future<void> markNotificationClicked(String notificationId) async {}
 
   @override
   Future<void> signOut() async {

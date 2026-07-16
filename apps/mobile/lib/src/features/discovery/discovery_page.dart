@@ -18,6 +18,7 @@ class DiscoveryPage extends StatefulWidget {
     required this.locationLoader,
     this.initialPreferredGenres,
     this.initialRadiusKm,
+    this.onOpenNotifications,
     super.key,
   });
 
@@ -25,6 +26,7 @@ class DiscoveryPage extends StatefulWidget {
   final UserLocationLoader locationLoader;
   final Set<String>? initialPreferredGenres;
   final double? initialRadiusKm;
+  final VoidCallback? onOpenNotifications;
 
   @override
   State<DiscoveryPage> createState() => _DiscoveryPageState();
@@ -233,16 +235,8 @@ class _DiscoveryPageState extends State<DiscoveryPage> {
         title: const Text('LiveAround'),
         actions: [
           IconButton(
-            tooltip: 'Notifications',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Activez les alertes depuis l\'onglet Profil. L\'envoi de notifications arrive avec FCM.',
-                  ),
-                ),
-              );
-            },
+            tooltip: 'Alertes',
+            onPressed: widget.onOpenNotifications,
             icon: const Icon(Icons.notifications_none_rounded),
           ),
         ],
@@ -702,11 +696,6 @@ class ConcertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateLabel =
-        '${concert.startsAt.day.toString().padLeft(2, '0')}/${concert.startsAt.month.toString().padLeft(2, '0')}';
-    final timeLabel =
-        '${concert.startsAt.hour.toString().padLeft(2, '0')}:${concert.startsAt.minute.toString().padLeft(2, '0')}';
-
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -716,33 +705,7 @@ class ConcertCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 68,
-                height: 88,
-                decoration: BoxDecoration(
-                  color: LiveAroundTheme.teal,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      dateLabel,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      timeLabel,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.78),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _ConcertThumbnail(concert: concert),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -803,6 +766,87 @@ class ConcertCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Vignette du concert : image de l'artiste (fournie par Ticketmaster) avec
+/// la date en surimpression, ou bloc date seul quand il n'y a pas d'image.
+class _ConcertThumbnail extends StatelessWidget {
+  const _ConcertThumbnail({required this.concert});
+
+  final Concert concert;
+
+  @override
+  Widget build(BuildContext context) {
+    final dateLabel =
+        '${concert.startsAt.day.toString().padLeft(2, '0')}/${concert.startsAt.month.toString().padLeft(2, '0')}';
+    final timeLabel =
+        '${concert.startsAt.hour.toString().padLeft(2, '0')}:${concert.startsAt.minute.toString().padLeft(2, '0')}';
+
+    final dateBox = Container(
+      width: 68,
+      height: 88,
+      decoration: BoxDecoration(
+        color: LiveAroundTheme.teal,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            dateLabel,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            timeLabel,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.78)),
+          ),
+        ],
+      ),
+    );
+
+    final imageUrl = concert.imageUrl;
+    if (imageUrl == null || imageUrl.isEmpty) return dateBox;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 68,
+        height: 88,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => dateBox,
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                color: Colors.black.withValues(alpha: 0.55),
+                child: Text(
+                  dateLabel,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

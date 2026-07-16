@@ -1,3 +1,4 @@
+import '../domain/app_notification.dart';
 import '../domain/concert.dart';
 import '../domain/user_profile.dart';
 
@@ -29,6 +30,10 @@ abstract interface class AccountRepository {
   });
 
   Future<List<Concert>> findFavorites();
+
+  Future<List<AppNotification>> findNotifications();
+
+  Future<void> markNotificationClicked(String notificationId);
 
   Future<void> signOut();
 }
