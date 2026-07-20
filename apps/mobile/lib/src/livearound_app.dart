@@ -40,6 +40,10 @@ class LiveAroundApp extends StatelessWidget {
 
     final resolvedTokenProvider = tokenProvider ?? identityStore.readToken;
 
+    // Signal declenche par le repository quand la session est irrecuperable
+    // (jeton et refresh expires) : AuthGate revient a l'ecran de connexion.
+    final sessionExpired = ValueNotifier<int>(0);
+
     return LiveAroundApp._(
       repository: repository ??
           ApiConcertRepository(
@@ -54,9 +58,11 @@ class LiveAroundApp extends StatelessWidget {
             fallbackRepository: MockAccountRepository(
               concertRepository: fallbackConcertRepository,
             ),
+            onSessionExpired: () => sessionExpired.value++,
           ),
       locationLoader:
           locationLoader ?? const UserLocationService().determineLocation,
+      sessionExpired: sessionExpired,
       key: key,
     );
   }
@@ -65,12 +71,14 @@ class LiveAroundApp extends StatelessWidget {
     required this.repository,
     required this.accountRepository,
     required this.locationLoader,
+    this.sessionExpired,
     super.key,
   });
 
   final ConcertRepository repository;
   final AccountRepository accountRepository;
   final UserLocationLoader locationLoader;
+  final Listenable? sessionExpired;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +90,7 @@ class LiveAroundApp extends StatelessWidget {
         repository: repository,
         accountRepository: accountRepository,
         locationLoader: locationLoader,
+        sessionExpired: sessionExpired,
       ),
     );
   }

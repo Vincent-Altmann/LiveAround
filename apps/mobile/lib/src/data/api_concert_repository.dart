@@ -24,12 +24,13 @@ class ApiConcertRepository implements ConcertRepository {
   final http.Client _client;
 
   @override
-  Future<List<Concert>> findNearby(ConcertFilters filters) async {
+  Future<List<Concert>> findNearby(ConcertFilters filters, {int page = 0}) async {
     try {
       final uri = _buildUri('/concerts', {
         'latitude': filters.latitude.toString(),
         'longitude': filters.longitude.toString(),
         'radiusKm': filters.radiusKm.round().toString(),
+        if (page > 0) 'page': page.toString(),
         if (filters.query.trim().isNotEmpty) 'query': filters.query.trim(),
         if (filters.selectedGenres.isNotEmpty)
           'genres': filters.selectedGenres.join(','),
@@ -46,7 +47,7 @@ class ApiConcertRepository implements ConcertRepository {
 
       return concerts;
     } catch (_) {
-      return _fallbackRepository.findNearby(filters);
+      return _fallbackRepository.findNearby(filters, page: page);
     }
   }
 

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 
+import { DatabaseModule } from '../database/database.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -9,13 +10,16 @@ import { OptionalSessionGuard, SessionGuard } from './session.guard';
 
 @Module({
   imports: [
+    DatabaseModule,
     UsersModule,
     JwtModule.registerAsync({
       global: true,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: resolveJwtSecret(config),
-        signOptions: { expiresIn: '30d' },
+        // Jeton d'acces court : le renouvellement passe par le refresh
+        // token rotatif de 90 jours (POST /auth/refresh).
+        signOptions: { expiresIn: '7d' },
       }),
     }),
   ],

@@ -7,6 +7,191 @@ import '../../theme/livearound_theme.dart';
 
 enum _AuthMode { login, register }
 
+/// Reinitialisation en deux etapes : demande du code par email, puis saisie
+/// du code et du nouveau mot de passe. En developpement, le code est affiche
+/// directement (l'envoi par email reste a brancher cote API).
+class PasswordResetDialog extends StatefulWidget {
+  const PasswordResetDialog({
+    required this.accountRepository,
+    this.initialEmail = '',
+    super.key,
+  });
+
+  final AccountRepository accountRepository;
+  final String initialEmail;
+
+  @override
+  State<PasswordResetDialog> createState() => _PasswordResetDialogState();
+}
+
+class _PasswordResetDialogState extends State<PasswordResetDialog> {
+  late final TextEditingController _emailController;
+  final _codeController = TextEditingController();
+  final _passwordController = TextEditingController();
+  var _codeRequested = false;
+  var _isBusy = false;
+  String? _devCode;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _codeController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestCode() async {
+    final email = _emailController.text.trim();
+    if (!email.contains('@')) {
+      setState(() => _error = 'Saisissez un e-mail valide.');
+      return;
+    }
+
+    setState(() {
+      _isBusy = true;
+      _error = null;
+    });
+
+    try {
+      final devCode = await widget.accountRepository.requestPasswordReset(
+        email: email,
+      );
+      if (!mounted) return;
+      setState(() {
+        _codeRequested = true;
+        _devCode = devCode;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Demande impossible, reessayez plus tard.');
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
+    }
+  }
+
+  Future<void> _submitReset() async {
+    if (_codeController.text.trim().length != 6) {
+      setState(() => _error = 'Le code contient 6 chiffres.');
+      return;
+    }
+    if (_passwordController.text.length < 8) {
+      setState(() => _error = 'Nouveau mot de passe : minimum 8 caracteres.');
+      return;
+    }
+
+    setState(() {
+      _isBusy = true;
+      _error = null;
+    });
+
+    try {
+      await widget.accountRepository.resetPassword(
+        email: _emailController.text.trim(),
+        code: _codeController.text.trim(),
+        newPassword: _passwordController.text,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Code invalide ou expire.');
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Mot de passe oublie'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _emailController,
+              enabled: !_codeRequested,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.alternate_email_rounded),
+                labelText: 'E-mail',
+              ),
+            ),
+            if (_codeRequested) ...[
+              const SizedBox(height: 12),
+              if (_devCode != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Code (mode developpement) : $_devCode',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              TextField(
+                controller: _codeController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.pin_rounded),
+                  labelText: 'Code a 6 chiffres',
+                  counterText: '',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.lock_outline_rounded),
+                  labelText: 'Nouveau mot de passe',
+                ),
+              ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isBusy ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Annuler'),
+        ),
+        FilledButton(
+          onPressed: _isBusy
+              ? null
+              : _codeRequested
+                  ? _submitReset
+                  : _requestCode,
+          child: Text(
+            _isBusy
+                ? 'Patientez...'
+                : _codeRequested
+                    ? 'Reinitialiser'
+                    : 'Recevoir un code',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class AuthPage extends StatefulWidget {
   const AuthPage({
     required this.accountRepository,
@@ -74,6 +259,24 @@ class _AuthPageState extends State<AuthPage> {
           _isSubmitting = false;
         });
       }
+    }
+  }
+
+  Future<void> _openPasswordReset() async {
+    final success = await showDialog<bool>(
+      context: context,
+      builder: (context) => PasswordResetDialog(
+        accountRepository: widget.accountRepository,
+        initialEmail: _emailController.text,
+      ),
+    );
+
+    if (success == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mot de passe reinitialise, connectez-vous.'),
+        ),
+      );
     }
   }
 
@@ -204,6 +407,14 @@ class _AuthPageState extends State<AuthPage> {
                         return null;
                       },
                     ),
+                    if (!isRegister)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _isSubmitting ? null : _openPasswordReset,
+                          child: const Text('Mot de passe oublie ?'),
+                        ),
+                      ),
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 12),
                       Text(

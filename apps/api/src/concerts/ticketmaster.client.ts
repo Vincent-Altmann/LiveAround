@@ -90,6 +90,7 @@ export class TicketmasterClient {
     url.searchParams.set('unit', 'km');
     url.searchParams.set('sort', 'distance,asc');
     url.searchParams.set('size', '50');
+    url.searchParams.set('page', String(query.page ?? 0));
     url.searchParams.set('includeTBA', 'no');
     url.searchParams.set('includeTBD', 'no');
     url.searchParams.set(

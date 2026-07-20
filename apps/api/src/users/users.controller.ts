@@ -1,7 +1,16 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 
 import { SessionDeviceId } from '../auth/session-device-id.decorator';
 import { SessionGuard } from '../auth/session.guard';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { UpsertCurrentUserDto } from './dto/upsert-current-user.dto';
 import { UsersService } from './users.service';
@@ -38,5 +47,13 @@ export class UsersController {
   @Get('me/favorites')
   findFavorites(@SessionDeviceId() deviceId: string) {
     return this.usersService.findFavoriteConcerts(deviceId);
+  }
+
+  @Delete('me')
+  deleteAccount(
+    @SessionDeviceId() deviceId: string,
+    @Body() body: DeleteAccountDto,
+  ) {
+    return this.usersService.deleteAccount(deviceId, body.password);
   }
 }

@@ -10,11 +10,16 @@ class FavoritesPage extends StatefulWidget {
   const FavoritesPage({
     required this.accountRepository,
     required this.concertRepository,
+    this.refreshTrigger,
     super.key,
   });
 
   final AccountRepository accountRepository;
   final ConcertRepository concertRepository;
+
+  /// Notifie quand la liste doit etre rechargee (retour sur l'onglet),
+  /// sans reconstruire la page entiere.
+  final Listenable? refreshTrigger;
 
   @override
   State<FavoritesPage> createState() => _FavoritesPageState();
@@ -27,6 +32,17 @@ class _FavoritesPageState extends State<FavoritesPage> {
   void initState() {
     super.initState();
     _refresh();
+    widget.refreshTrigger?.addListener(_onRefreshTrigger);
+  }
+
+  @override
+  void dispose() {
+    widget.refreshTrigger?.removeListener(_onRefreshTrigger);
+    super.dispose();
+  }
+
+  void _onRefreshTrigger() {
+    if (mounted) setState(_refresh);
   }
 
   void _refresh() {

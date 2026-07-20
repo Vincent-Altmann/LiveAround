@@ -5,7 +5,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto';
+import { createHash, pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto';
 
 import { LoginDto } from '../auth/dto/login.dto';
 import { RegisterDto } from '../auth/dto/register.dto';
@@ -255,6 +255,227 @@ export class UsersService {
   }
 
   /**
+   * Recharge une session complete depuis l'identifiant interne du compte
+   * (utilise par le renouvellement de jeton).
+   */
+  async findSessionByUserId(userId: string): Promise<AuthSessionModel | null> {
+    const result = await this.database.query<UserRow>(
+      `
+        SELECT
+          id,
+          device_id,
+          email,
+          display_name,
+          preferred_genres,
+          preferred_radius_km,
+          notification_opt_in,
+          created_at,
+          updated_at,
+          (
+            SELECT COUNT(*)
+            FROM user_concert_favorites favorites
+            WHERE favorites.user_id = users.id
+          ) AS favorites_count
+        FROM users
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [userId],
+    );
+
+    const user = result.rows[0];
+    if (!user) return null;
+
+    const deviceId = user.device_id ?? generateAccountDeviceId();
+    if (!user.device_id) {
+      await this.database.query(
+        'UPDATE users SET device_id = $2, updated_at = now() WHERE id = $1',
+        [user.id, deviceId],
+      );
+    }
+
+    return toAuthSession(deviceId, user);
+  }
+
+  /**
+   * Change le mot de passe apres verification de l'actuel. Renvoie la
+   * session pour reemettre des jetons (les anciens sont revoques).
+   */
+  async changePassword(
+    deviceId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<AuthSessionModel> {
+    try {
+      const result = await this.database.query<
+        UserRow & { password_hash: string | null }
+      >(
+        'SELECT id, password_hash FROM users WHERE device_id = $1 LIMIT 1',
+        [normalizeDeviceId(deviceId)],
+      );
+
+      const user = result.rows[0];
+      if (
+        !user?.password_hash ||
+        !verifyPassword(currentPassword, user.password_hash)
+      ) {
+        throw new UnauthorizedException('Mot de passe actuel invalide');
+      }
+
+      await this.database.query(
+        'UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1',
+        [user.id, hashPassword(newPassword)],
+      );
+
+      const session = await this.findSessionByUserId(user.id);
+      if (!session) throw new UnauthorizedException('Session requise');
+      return session;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      this.logger.error(`Changement de mot de passe impossible: ${errorMessage(error)}`);
+      throw new ServiceUnavailableException(
+        'Base de donnees indisponible, reessayez plus tard',
+      );
+    }
+  }
+
+  /**
+   * Genere un code de reinitialisation a 6 chiffres (15 min). Renvoie null
+   * si l'email est inconnu : la reponse HTTP reste identique pour ne pas
+   * permettre l'enumeration des comptes.
+   */
+  async createPasswordResetCode(
+    email: string,
+  ): Promise<{ userId: string; code: string } | null> {
+    const normalizedEmail =
+      normalizeEmail(email) ?? email.trim().toLowerCase();
+
+    try {
+      const result = await this.database.query<{ id: string }>(
+        'SELECT id FROM users WHERE email = $1 AND password_hash IS NOT NULL LIMIT 1',
+        [normalizedEmail],
+      );
+
+      const user = result.rows[0];
+      if (!user) return null;
+
+      const code = String(randomInt6());
+      await this.database.query(
+        `
+          INSERT INTO password_reset_codes (user_id, code_hash, expires_at)
+          VALUES ($1, $2, now() + interval '15 minutes')
+          ON CONFLICT (user_id) DO UPDATE SET
+            code_hash = EXCLUDED.code_hash,
+            expires_at = EXCLUDED.expires_at,
+            created_at = now()
+        `,
+        [user.id, hashResetCode(code)],
+      );
+
+      return { userId: user.id, code };
+    } catch (error) {
+      this.logger.error(`Creation du code de reset impossible: ${errorMessage(error)}`);
+      throw new ServiceUnavailableException(
+        'Base de donnees indisponible, reessayez plus tard',
+      );
+    }
+  }
+
+  /** Verifie le code de reinitialisation et applique le nouveau mot de passe. */
+  async resetPassword(
+    email: string,
+    code: string,
+    newPassword: string,
+  ): Promise<string> {
+    const normalizedEmail =
+      normalizeEmail(email) ?? email.trim().toLowerCase();
+
+    try {
+      const result = await this.database.query<{
+        id: string;
+        code_hash: string | null;
+        expires_at: Date | string | null;
+      }>(
+        `
+          SELECT users.id, codes.code_hash, codes.expires_at
+          FROM users
+          LEFT JOIN password_reset_codes codes ON codes.user_id = users.id
+          WHERE users.email = $1
+          LIMIT 1
+        `,
+        [normalizedEmail],
+      );
+
+      const row = result.rows[0];
+      const isValid =
+        row?.code_hash != null &&
+        row.expires_at != null &&
+        new Date(row.expires_at) > new Date() &&
+        timingSafeEqualHex(row.code_hash, hashResetCode(code.trim()));
+
+      if (!row || !isValid) {
+        throw new UnauthorizedException('Code invalide ou expire');
+      }
+
+      await this.database.query(
+        'UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1',
+        [row.id, hashPassword(newPassword)],
+      );
+      await this.database.query(
+        'DELETE FROM password_reset_codes WHERE user_id = $1',
+        [row.id],
+      );
+
+      return row.id;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      this.logger.error(`Reset de mot de passe impossible: ${errorMessage(error)}`);
+      throw new ServiceUnavailableException(
+        'Base de donnees indisponible, reessayez plus tard',
+      );
+    }
+  }
+
+  /**
+   * Suppression de compte (RGPD) : confirmation par mot de passe, puis
+   * suppression en cascade (favoris, notifications, refresh tokens) ;
+   * les signalements sont anonymises (SET NULL).
+   */
+  async deleteAccount(deviceId: string, password: string | undefined) {
+    try {
+      const result = await this.database.query<{
+        id: string;
+        password_hash: string | null;
+      }>(
+        'SELECT id, password_hash FROM users WHERE device_id = $1 LIMIT 1',
+        [normalizeDeviceId(deviceId)],
+      );
+
+      const user = result.rows[0];
+      if (!user) {
+        throw new UnauthorizedException('Session requise');
+      }
+
+      if (
+        user.password_hash &&
+        (!password || !verifyPassword(password, user.password_hash))
+      ) {
+        throw new UnauthorizedException('Mot de passe invalide');
+      }
+
+      await this.database.query('DELETE FROM users WHERE id = $1', [user.id]);
+      this.fallbackUsers.delete(normalizeDeviceId(deviceId));
+      return { deleted: true };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      this.logger.error(`Suppression de compte impossible: ${errorMessage(error)}`);
+      throw new ServiceUnavailableException(
+        'Base de donnees indisponible, reessayez plus tard',
+      );
+    }
+  }
+
+  /**
    * Memorise la derniere position de recherche : c'est elle qui sert de
    * point de reference aux alertes personnalisees. Jamais bloquant.
    */
@@ -489,6 +710,22 @@ function displayNameFromEmail(email: string) {
 
 function generateAccountDeviceId() {
   return `account-${randomBytes(16).toString('hex')}`;
+}
+
+function randomInt6() {
+  // Code a 6 chiffres uniforme (100000-999999) base sur un alea crypto.
+  return 100000 + (randomBytes(4).readUInt32BE(0) % 900000);
+}
+
+function hashResetCode(code: string) {
+  return createHash('sha256').update(code).digest('hex');
+}
+
+function timingSafeEqualHex(expectedHex: string, candidateHex: string) {
+  const expected = Buffer.from(expectedHex, 'hex');
+  const candidate = Buffer.from(candidateHex, 'hex');
+  if (expected.length !== candidate.length) return false;
+  return timingSafeEqual(expected, candidate);
 }
 
 function hashPassword(password: string) {
