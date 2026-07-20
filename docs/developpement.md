@@ -2,119 +2,67 @@
 
 ## Prerequis
 
-- Flutter SDK.
-- Node.js 20 ou superieur.
-- npm fonctionnel.
-- Docker Desktop pour PostgreSQL/PostGIS.
+- Flutter SDK (stable) ;
+- Node.js 22 et npm ;
+- Docker Desktop (PostgreSQL/PostGIS).
 
-## Mobile
-
-```bash
-cd apps/mobile
-flutter pub get
-flutter test
-flutter run
-```
-
-Le MVP mobile appelle l'API NestJS lorsque `LIVEAROUND_API_BASE_URL` est disponible, avec un fallback mock pour conserver une experience testable hors ligne.
-
-L'application affiche d'abord une page de connexion. Apres connexion ou creation de compte, l'identifiant de session renvoye par l'API est conserve avec `shared_preferences` puis envoye dans l'en-tete `x-livearound-device-id`.
-
-## API
+## Demarrage rapide
 
 ```bash
-cd apps/api
-npm install
-npm run start:dev
+# Base de donnees
+cd apps/api && docker compose up -d
+
+# API (migrations appliquees automatiquement au demarrage)
+npm install && npm run start:dev
+
+# Mobile (emulateur Android : l'hote est accessible via 10.0.2.2)
+cd ../mobile && flutter pub get
+flutter run --dart-define LIVEAROUND_API_BASE_URL=http://10.0.2.2:3000
 ```
 
-API locale attendue :
+Cle Ticketmaster : creer `apps/api/.env` a partir de `.env.example`. Sans cle, l'API sert le cache PostGIS puis les donnees de demonstration. Mode demo sans API : `flutter run --dart-define LIVEAROUND_DEMO_MODE=true`.
 
-```text
-http://localhost:3000
-```
-
-Endpoints initiaux :
-
-- `GET /health`
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /users/me`
-- `GET /users/me`
-- `PATCH /users/me/preferences`
-- `GET /users/me/favorites`
-- `GET /concerts`
-- `GET /concerts/:id`
-- `POST /concerts/:id/favorite`
-- `POST /concerts/:id/report`
-
-Exemple de creation de compte :
+## Verifications locales (identiques a la CI)
 
 ```bash
+cd apps/api && npm run lint && npm run build && npm test
+cd apps/mobile && flutter analyze && flutter test
+```
+
+## Authentification
+
+`POST /auth/register` et `POST /auth/login` renvoient `accessToken` (JWT 7 j) et `refreshToken` (rotatif 90 j). Les endpoints proteges attendent `Authorization: Bearer <accessToken>` ; le renouvellement passe par `POST /auth/refresh`.
+
+```bash
+# Creation de compte
 curl -X POST http://localhost:3000/auth/register \
   -H "content-type: application/json" \
   -d '{"displayName":"Demo","email":"demo@livearound.local","password":"Concerts123!"}'
+
+# Requete authentifiee
+curl http://localhost:3000/users/me -H "Authorization: Bearer <accessToken>"
 ```
 
-Exemple de connexion :
+## Endpoints
 
-```bash
-curl -X POST http://localhost:3000/auth/login \
-  -H "content-type: application/json" \
-  -d '{"email":"demo@livearound.local","password":"Concerts123!"}'
-```
+Documentation interactive Swagger : `http://localhost:3000/docs`.
 
-Exemple de creation ou chargement du compte courant :
-
-```bash
-curl -X POST http://localhost:3000/users/me \
-  -H "content-type: application/json" \
-  -d '{"deviceId":"mobile-demo","displayName":"Demo","email":"demo@users.livearound.local"}'
-```
-
-Exemple de sauvegarde des preferences :
-
-```bash
-curl -X PATCH http://localhost:3000/users/me/preferences \
-  -H "content-type: application/json" \
-  -H "x-livearound-device-id: mobile-demo" \
-  -d '{"preferredGenres":["Rock","Jazz"],"preferredRadiusKm":40}'
-```
+| Domaine | Endpoints |
+|---|---|
+| Sante | `GET /health` |
+| Auth | `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/change-password`, `/auth/forgot-password`, `/auth/reset-password` |
+| Compte | `GET/POST /users/me`, `PATCH /users/me/preferences`, `GET /users/me/favorites`, `DELETE /users/me` |
+| Concerts | `GET /concerts` (position, rayon, genres, dates, recherche, page), `GET /concerts/:id`, `POST /concerts/:id/favorite`, `POST /concerts/:id/report` |
+| Alertes | `GET /users/me/notifications`, `POST /users/me/notifications/:id/click` |
 
 ## Base de donnees
 
-```bash
-cd apps/api
-"C:\Program Files\Docker\Docker\resources\bin\docker.exe" compose up -d
-```
+Le schema est gere par les **migrations versionnees** de `apps/api/src/database/migrations.ts` (voir table `schema_migrations`). Pour ajouter une evolution : ajouter une entree avec un `id` superieur — ne jamais modifier une migration fusionnee. Si PostgreSQL est injoignable, l'API demarre en mode degrade (etat volatil, auth indisponible) en le journalisant.
 
-PostgreSQL est expose sur `localhost:5432`.
+## Emulateur Android
 
-L'API applique les migrations de developpement au demarrage :
+Voir [emulateur-vscode.md](emulateur-vscode.md). AVD utilise pour la recette : `Medium_Phone_API_35`.
 
-- ajout de `device_id` sur `users` ;
-- hash de mot de passe `password_hash` ;
-- preferences `preferred_genres` et `preferred_radius_km` ;
-- table `user_concert_favorites` pour les favoris Ticketmaster sauvegardes avec un snapshot JSON.
+## Conventions
 
-Si PostgreSQL n'est pas joignable en local, l'API demarre tout de meme avec un stockage volatile afin de garder l'application mobile testable.
-
-### Docker Desktop sous Windows
-
-Docker Desktop est installe dans `C:\Program Files\Docker\Docker` lorsque l'installeur officiel est utilise. Si `docker info` indique que le daemon n'est pas joignable et que `wsl --status` indique que WSL n'est pas installe, ouvrir PowerShell en administrateur puis lancer :
-
-```powershell
-dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
-dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
-wsl --install
-```
-
-Redemarrer Windows si l'une de ces commandes le demande, ouvrir Docker Desktop, puis relancer la commande `docker compose up -d` depuis `apps/api`.
-
-## Prochaines integrations
-
-- Cle Ticketmaster reelle dans `apps/api/.env`.
-- Geocodage ville -> latitude/longitude.
-- Jetons JWT pour remplacer le `deviceId` de session MVP.
-- Persistance avancee des signalements.
-- Firebase Cloud Messaging.
+Branches `feat/*` / `fix/*` depuis `main`, commits `type(scope): sujet`, fusion par pull request avec CI verte — protocole complet : [integration-continue.md](integration-continue.md).

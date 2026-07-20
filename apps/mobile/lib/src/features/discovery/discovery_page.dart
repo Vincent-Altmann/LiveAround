@@ -617,6 +617,8 @@ class _RadiusFilter extends StatelessWidget {
               min: 5,
               max: 120,
               divisions: 23,
+              // Annonce la valeur aux lecteurs d'ecran pendant le reglage.
+              label: '${radiusKm.round()} km',
               value: radiusKm.clamp(5, 120).toDouble(),
               onChanged: onChanged,
               onChangeEnd: onChangeEnd,
@@ -729,7 +731,8 @@ class ConcertCard extends StatelessWidget {
                     Text(
                       '${concert.venue.name}, ${concert.venue.city}',
                       style: TextStyle(
-                        color: Colors.black.withValues(alpha: 0.58),
+                        // Contraste AA (>= 4.5:1) sur fond carte blanc.
+                        color: Colors.black.withValues(alpha: 0.68),
                       ),
                     ),
                   ],
@@ -746,7 +749,7 @@ class ConcertCard extends StatelessWidget {
                       : Icons.favorite_border_rounded,
                   color: concert.isFavorite
                       ? LiveAroundTheme.coral
-                      : Colors.black.withValues(alpha: 0.54),
+                      : Colors.black.withValues(alpha: 0.66),
                 ),
               ),
             ],
@@ -811,6 +814,7 @@ class _ConcertThumbnail extends StatelessWidget {
             Image.network(
               imageUrl,
               fit: BoxFit.cover,
+              semanticLabel: 'Photo de ${concert.artist}',
               errorBuilder: (_, __, ___) => dateBox,
             ),
             Positioned(

@@ -117,7 +117,7 @@ class _NotificationCard extends StatelessWidget {
               ? Icons.notifications_none_rounded
               : Icons.notifications_active_rounded,
           color: notification.isRead
-              ? Colors.black.withValues(alpha: 0.45)
+              ? Colors.black.withValues(alpha: 0.6)
               : LiveAroundTheme.coral,
         ),
         title: Text(
