@@ -2,7 +2,7 @@
 
 Historique des versions de LiveAround. Format inspire de [Keep a Changelog](https://keepachangelog.com/fr/), versionnement semantique. Chaque version correspond a un tag Git et a une release GitHub.
 
-## [Non publie]
+## [0.5.0] — 2026-07-21
 
 ### Ajoute
 - Rappels de concerts favoris (opt-in dans le profil) : notification unique quand un concert en favoris demarre dans moins de 3 jours (« c'est aujourd'hui / c'est demain / dans N jours »), affichee dans le centre d'alertes avec une icone calendrier. Les notifications sont desormais typees (alerte decouverte / rappel de favori).
@@ -44,6 +44,7 @@ Historique des versions de LiveAround. Format inspire de [Keep a Changelog](http
 - Filtres de genre sans resultat face aux classifications Ticketmaster (fiche d'anomalie 002).
 - Authentification sans verification cote serveur (en-tete client accepte tel quel) remplacee par des sessions JWT signees.
 
+[0.5.0]: https://github.com/Vincent-Altmann/LiveAround/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Vincent-Altmann/LiveAround/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Vincent-Altmann/LiveAround/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Vincent-Altmann/LiveAround/releases/tag/v0.2.0
