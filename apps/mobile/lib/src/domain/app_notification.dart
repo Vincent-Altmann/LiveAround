@@ -8,6 +8,7 @@ class AppNotification {
     required this.body,
     required this.createdAt,
     this.clickedAt,
+    this.kind = 'new_concert',
   });
 
   final String id;
@@ -17,7 +18,12 @@ class AppNotification {
   final DateTime createdAt;
   final DateTime? clickedAt;
 
+  /// 'new_concert' (alerte decouverte) ou 'favorite_reminder' (rappel).
+  final String kind;
+
   bool get isRead => clickedAt != null;
+
+  bool get isFavoriteReminder => kind == 'favorite_reminder';
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {
     return AppNotification(
@@ -29,6 +35,7 @@ class AppNotification {
       clickedAt: json['clickedAt'] == null
           ? null
           : DateTime.parse(json['clickedAt'] as String),
+      kind: json['kind'] as String? ?? 'new_concert',
     );
   }
 }

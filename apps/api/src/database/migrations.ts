@@ -146,4 +146,20 @@ export const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    id: 4,
+    name: 'rappels-concerts-favoris',
+    up: `
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS favorite_reminders_opt_in BOOLEAN NOT NULL DEFAULT false;
+
+      ALTER TABLE user_notifications ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'new_concert';
+
+      -- L'unicite passe de (utilisateur, concert) a (utilisateur, concert,
+      -- type) : un meme concert peut recevoir une alerte decouverte ET un
+      -- rappel de favori, mais jamais deux notifications du meme type.
+      ALTER TABLE user_notifications DROP CONSTRAINT IF EXISTS user_notifications_user_id_concert_external_id_key;
+      CREATE UNIQUE INDEX IF NOT EXISTS user_notifications_user_concert_kind_idx
+        ON user_notifications (user_id, concert_external_id, kind);
+    `,
+  },
 ];

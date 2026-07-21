@@ -113,9 +113,13 @@ class _NotificationCard extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         leading: Icon(
-          notification.isRead
-              ? Icons.notifications_none_rounded
-              : Icons.notifications_active_rounded,
+          notification.isFavoriteReminder
+              ? (notification.isRead
+                  ? Icons.event_available_outlined
+                  : Icons.event_available_rounded)
+              : (notification.isRead
+                  ? Icons.notifications_none_rounded
+                  : Icons.notifications_active_rounded),
           color: notification.isRead
               ? Colors.black.withValues(alpha: 0.6)
               : LiveAroundTheme.coral,

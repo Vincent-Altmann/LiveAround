@@ -2,6 +2,11 @@
 
 Historique des versions de LiveAround. Format inspire de [Keep a Changelog](https://keepachangelog.com/fr/), versionnement semantique. Chaque version correspond a un tag Git et a une release GitHub.
 
+## [Non publie]
+
+### Ajoute
+- Rappels de concerts favoris (opt-in dans le profil) : notification unique quand un concert en favoris demarre dans moins de 3 jours (« c'est aujourd'hui / c'est demain / dans N jours »), affichee dans le centre d'alertes avec une icone calendrier. Les notifications sont desormais typees (alerte decouverte / rappel de favori).
+
 ## [0.4.0] — 2026-07-22
 
 ### Ajoute

@@ -83,12 +83,14 @@ class MockAccountRepository implements AccountRepository {
     required Set<String> preferredGenres,
     required double preferredRadiusKm,
     bool? notificationOptIn,
+    bool? favoriteRemindersOptIn,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 120));
     _profile = _profile.copyWith(
       preferredGenres: preferredGenres,
       preferredRadiusKm: preferredRadiusKm,
       notificationOptIn: notificationOptIn,
+      favoriteRemindersOptIn: favoriteRemindersOptIn,
     );
     return _profile;
   }

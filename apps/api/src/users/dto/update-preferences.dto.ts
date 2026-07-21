@@ -33,4 +33,9 @@ export class UpdatePreferencesDto {
   @IsOptional()
   @IsBoolean()
   notificationOptIn?: boolean;
+
+  // Rappels quelques jours avant un concert place en favoris.
+  @IsOptional()
+  @IsBoolean()
+  favoriteRemindersOptIn?: boolean;
 }
