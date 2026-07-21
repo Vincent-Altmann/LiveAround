@@ -5,6 +5,7 @@ export interface UserProfileModel {
   preferredGenres: string[];
   preferredRadiusKm: number;
   notificationOptIn: boolean;
+  favoriteRemindersOptIn: boolean;
   favoritesCount: number;
   createdAt: string;
   updatedAt: string;
@@ -29,6 +30,7 @@ export interface UserRow {
   preferred_genres: string[] | null;
   preferred_radius_km: number | null;
   notification_opt_in?: boolean | null;
+  favorite_reminders_opt_in?: boolean | null;
   favorites_count?: string | number | null;
   created_at: Date | string;
   updated_at: Date | string;

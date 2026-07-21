@@ -56,6 +56,7 @@ export class UsersService {
             preferred_genres,
             preferred_radius_km,
             notification_opt_in,
+            favorite_reminders_opt_in,
             created_at,
             updated_at,
             (
@@ -102,6 +103,7 @@ export class UsersService {
             preferred_genres,
             preferred_radius_km,
             notification_opt_in,
+            favorite_reminders_opt_in,
             created_at,
             updated_at,
             (
@@ -176,6 +178,7 @@ export class UsersService {
             preferred_genres,
             preferred_radius_km,
             notification_opt_in,
+            favorite_reminders_opt_in,
             created_at,
             updated_at,
             (
@@ -208,6 +211,7 @@ export class UsersService {
     const genres = sanitizeGenres(preferences.preferredGenres);
     const radiusKm = clampRadius(preferences.preferredRadiusKm);
     const notificationOptIn = preferences.notificationOptIn ?? null;
+    const favoriteRemindersOptIn = preferences.favoriteRemindersOptIn ?? null;
 
     try {
       const user = await this.getOrCreateCurrentUser(normalizedDeviceId);
@@ -218,6 +222,7 @@ export class UsersService {
             preferred_genres = $2,
             preferred_radius_km = $3,
             notification_opt_in = COALESCE($4, notification_opt_in),
+            favorite_reminders_opt_in = COALESCE($5, favorite_reminders_opt_in),
             updated_at = now()
           WHERE id = $1
           RETURNING
@@ -227,6 +232,7 @@ export class UsersService {
             preferred_genres,
             preferred_radius_km,
             notification_opt_in,
+            favorite_reminders_opt_in,
             created_at,
             updated_at,
             (
@@ -235,7 +241,7 @@ export class UsersService {
               WHERE favorites.user_id = users.id
             ) AS favorites_count
         `,
-        [user.id, genres, radiusKm, notificationOptIn],
+        [user.id, genres, radiusKm, notificationOptIn, favoriteRemindersOptIn],
       );
 
       return toProfile(result.rows[0]);
@@ -248,6 +254,8 @@ export class UsersService {
         preferredRadiusKm: radiusKm,
         notificationOptIn:
           notificationOptIn ?? fallback.profile.notificationOptIn,
+        favoriteRemindersOptIn:
+          favoriteRemindersOptIn ?? fallback.profile.favoriteRemindersOptIn,
         updatedAt: new Date().toISOString(),
       };
       return fallback.profile;
@@ -626,6 +634,7 @@ export class UsersService {
         preferredGenres: [],
         preferredRadiusKm: 25,
         notificationOptIn: false,
+        favoriteRemindersOptIn: false,
         favoritesCount: 0,
         createdAt: now,
         updatedAt: now,
@@ -649,6 +658,7 @@ function toProfile(row: UserRow): UserProfileModel {
     preferredGenres: row.preferred_genres ?? [],
     preferredRadiusKm: row.preferred_radius_km ?? 25,
     notificationOptIn: row.notification_opt_in ?? false,
+    favoriteRemindersOptIn: row.favorite_reminders_opt_in ?? false,
     favoritesCount: Number(row.favorites_count ?? 0),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),

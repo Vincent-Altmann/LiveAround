@@ -29,6 +29,7 @@ class _ProfilePageState extends State<ProfilePage> {
   late Set<String> _selectedGenres;
   late double _radiusKm;
   late bool _notificationOptIn;
+  late bool _favoriteRemindersOptIn;
   var _isSaving = false;
 
   static const List<String> _genres = [
@@ -50,6 +51,7 @@ class _ProfilePageState extends State<ProfilePage> {
     _selectedGenres = widget.initialProfile.preferredGenres;
     _radiusKm = widget.initialProfile.preferredRadiusKm;
     _notificationOptIn = widget.initialProfile.notificationOptIn;
+    _favoriteRemindersOptIn = widget.initialProfile.favoriteRemindersOptIn;
   }
 
   @override
@@ -61,6 +63,7 @@ class _ProfilePageState extends State<ProfilePage> {
       _selectedGenres = widget.initialProfile.preferredGenres;
       _radiusKm = widget.initialProfile.preferredRadiusKm;
       _notificationOptIn = widget.initialProfile.notificationOptIn;
+      _favoriteRemindersOptIn = widget.initialProfile.favoriteRemindersOptIn;
     }
   }
 
@@ -85,6 +88,7 @@ class _ProfilePageState extends State<ProfilePage> {
         preferredGenres: _selectedGenres,
         preferredRadiusKm: _radiusKm,
         notificationOptIn: _notificationOptIn,
+        favoriteRemindersOptIn: _favoriteRemindersOptIn,
       );
 
       if (!mounted) return;
@@ -193,6 +197,20 @@ class _ProfilePageState extends State<ProfilePage> {
               title: const Text('Alertes concerts'),
               subtitle: const Text(
                 'Etre prevenu des nouveaux concerts correspondant a vos genres et votre rayon.',
+              ),
+              contentPadding: EdgeInsets.zero,
+            ),
+            SwitchListTile(
+              value: _favoriteRemindersOptIn,
+              onChanged: (value) {
+                setState(() {
+                  _favoriteRemindersOptIn = value;
+                });
+              },
+              secondary: const Icon(Icons.event_available_outlined),
+              title: const Text('Rappels de favoris'),
+              subtitle: const Text(
+                'Etre prevenu quelques jours avant un concert place en favoris, pour ne pas le manquer.',
               ),
               contentPadding: EdgeInsets.zero,
             ),

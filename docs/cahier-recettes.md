@@ -50,6 +50,7 @@ Statuts : ✅ conforme — ❌ non conforme — ⏳ a rejouer.
 | M13 | Opt-in requis | Alertes desactivees | aucune alerte generee | ✅ |
 | M14 | Generation d'alertes | Opt-in + recherche a Lyon + nouveaux concerts ingeres | alertes correspondant aux genres/rayon, max 3 par 24 h | ✅ |
 | M15 | Centre d'alertes | Cloche de l'ecran Decouvrir | liste des alertes, etat lu/non lu, ouverture de la fiche, clic historise | ✅ |
+| M16 | Rappel de favori | Opt-in « Rappels de favoris » + concert en favoris a moins de 3 jours | un rappel unique (« c'est demain ! ») dans le centre d'alertes, icone calendrier ; aucun doublon aux balayages suivants | ✅ |
 
 ## 5. Regression automatisee
 

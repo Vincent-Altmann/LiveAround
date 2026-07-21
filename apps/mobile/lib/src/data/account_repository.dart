@@ -27,6 +27,7 @@ abstract interface class AccountRepository {
     required Set<String> preferredGenres,
     required double preferredRadiusKm,
     bool? notificationOptIn,
+    bool? favoriteRemindersOptIn,
   });
 
   Future<List<Concert>> findFavorites();

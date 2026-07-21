@@ -130,6 +130,7 @@ class ApiAccountRepository implements AccountRepository {
     required Set<String> preferredGenres,
     required double preferredRadiusKm,
     bool? notificationOptIn,
+    bool? favoriteRemindersOptIn,
   }) async {
     try {
       final payload = await _patchJson(
@@ -139,6 +140,8 @@ class ApiAccountRepository implements AccountRepository {
           'preferredRadiusKm': preferredRadiusKm.round(),
           if (notificationOptIn != null)
             'notificationOptIn': notificationOptIn,
+          if (favoriteRemindersOptIn != null)
+            'favoriteRemindersOptIn': favoriteRemindersOptIn,
         },
       );
       return UserProfile.fromJson(payload as Map<String, dynamic>);
@@ -147,6 +150,7 @@ class ApiAccountRepository implements AccountRepository {
         preferredGenres: preferredGenres,
         preferredRadiusKm: preferredRadiusKm,
         notificationOptIn: notificationOptIn,
+        favoriteRemindersOptIn: favoriteRemindersOptIn,
       );
     }
   }
