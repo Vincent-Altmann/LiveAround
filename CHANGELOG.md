@@ -2,7 +2,7 @@
 
 Historique des versions de LiveAround. Format inspire de [Keep a Changelog](https://keepachangelog.com/fr/), versionnement semantique. Chaque version correspond a un tag Git et a une release GitHub.
 
-## [Non publie]
+## [0.4.0] — 2026-07-22
 
 ### Ajoute
 - Deploiement continu : Dockerfile de l'API, composition de production, workflow de release sur tag (image ghcr.io + APK attache a la release).
@@ -39,6 +39,7 @@ Historique des versions de LiveAround. Format inspire de [Keep a Changelog](http
 - Filtres de genre sans resultat face aux classifications Ticketmaster (fiche d'anomalie 002).
 - Authentification sans verification cote serveur (en-tete client accepte tel quel) remplacee par des sessions JWT signees.
 
+[0.4.0]: https://github.com/Vincent-Altmann/LiveAround/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Vincent-Altmann/LiveAround/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Vincent-Altmann/LiveAround/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Vincent-Altmann/LiveAround/releases/tag/v0.1.0
