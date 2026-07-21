@@ -180,10 +180,14 @@ class _HeroPanel extends StatelessWidget {
           // Image de l'artiste en fond quand Ticketmaster en fournit une,
           // assombrie pour garder le texte lisible.
           if (imageUrl != null && imageUrl.isNotEmpty)
-            Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            // Image decorative : les informations sont deja annoncees par le
+            // texte de la fiche, on ne double pas la lecture d'ecran.
+            ExcludeSemantics(
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
             ),
           if (imageUrl != null && imageUrl.isNotEmpty)
             DecoratedBox(

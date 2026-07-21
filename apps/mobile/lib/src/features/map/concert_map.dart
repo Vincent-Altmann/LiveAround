@@ -126,34 +126,39 @@ class _UserLocationMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: location.isFallback
+    return Semantics(
+      label: location.isFallback
           ? 'Position par defaut : ${location.label}'
           : 'Votre position',
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          border: Border.all(color: LiveAroundTheme.teal, width: 3),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: const Padding(
-          padding: EdgeInsets.all(7),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: LiveAroundTheme.teal,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.person_pin_circle_rounded,
-              color: Colors.white,
-              size: 20,
+      child: Tooltip(
+        message: location.isFallback
+            ? 'Position par defaut : ${location.label}'
+            : 'Votre position',
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: LiveAroundTheme.teal, width: 3),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: const Padding(
+            padding: EdgeInsets.all(7),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: LiveAroundTheme.teal,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.person_pin_circle_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ),
         ),
@@ -170,33 +175,38 @@ class _ConcertMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: '${concert.artist} - ${concert.venue.name}',
-      child: GestureDetector(
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.22),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: const Padding(
-            padding: EdgeInsets.all(6),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: LiveAroundTheme.coral,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.music_note_rounded,
-                color: Colors.white,
-                size: 20,
+    return Semantics(
+      button: true,
+      label:
+          'Concert de ${concert.artist} a ${concert.venue.name}, ouvrir la fiche',
+      child: Tooltip(
+        message: '${concert.artist} - ${concert.venue.name}',
+        child: GestureDetector(
+          onTap: onTap,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Padding(
+              padding: EdgeInsets.all(6),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: LiveAroundTheme.coral,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.music_note_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ),

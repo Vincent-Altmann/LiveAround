@@ -1,0 +1,44 @@
+# Deploiement de production : API + PostgreSQL/PostGIS.
+# Utilisation : voir docs/manuel-deploiement.md
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Variables a definir dans un fichier .env (jamais commite) :
+#   POSTGRES_PASSWORD, JWT_SECRET, TICKETMASTER_API_KEY, CORS_ORIGINS
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: livearound-postgres-prod
+    environment:
+      POSTGRES_USER: livearound
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definir POSTGRES_PASSWORD}
+      POSTGRES_DB: livearound
+    volumes:
+      - livearound-postgres-prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U livearound -d livearound"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    image: ghcr.io/vincent-altmann/livearound-api:${LIVEAROUND_VERSION:-latest}
+    container_name: livearound-api-prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://livearound:${POSTGRES_PASSWORD}@postgres:5432/livearound
+      JWT_SECRET: ${JWT_SECRET:?definir JWT_SECRET}
+      TICKETMASTER_API_KEY: ${TICKETMASTER_API_KEY:-}
+      TICKETMASTER_COUNTRY_CODE: FR
+      TICKETMASTER_LOCALE: fr-fr,*
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  livearound-postgres-prod:

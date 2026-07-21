@@ -19,6 +19,17 @@ apps/
 docs/       Documentation projet
 ```
 
+## Documentation
+
+| Theme | Documents |
+|---|---|
+| Conception | [Architecture](docs/architecture.md) · [Frameworks et paradigmes](docs/frameworks-paradigmes.md) · [Cadrage](docs/cadrage-synthese.md) · [Backlog](docs/backlog.md) · [Prototype](docs/prototype.md) |
+| Qualite | [Criteres qualite/performance](docs/qualite-performance.md) · [Cahier de recettes](docs/cahier-recettes.md) · [Securite](docs/securite.md) · [Accessibilite](docs/accessibilite.md) |
+| CI/CD | [Integration continue](docs/integration-continue.md) · [Deploiement continu](docs/deploiement-continu.md) |
+| Manuels | [Developpement](docs/developpement.md) · [Deploiement](docs/manuel-deploiement.md) · [Utilisation](docs/manuel-utilisation.md) · [Mise a jour](docs/manuel-mise-a-jour.md) |
+| Exploitation | [Supervision](docs/supervision.md) · [Anomalies (processus)](docs/anomalies-processus.md) · [Plan de correction des bogues](docs/plan-correction-bogues.md) · [Dependances](docs/dependances.md) |
+| Vie du projet | [CHANGELOG](CHANGELOG.md) · [Journal de version (exemplaire)](docs/journal-version.md) · [Fiches d'anomalies](docs/anomalies/) · [Support client (exemple)](docs/support-client.md) · [Recommandations](docs/recommandations.md) |
+
 ## MVP fonctionnel vise
 
 - Connexion, creation de compte et preferences musicales

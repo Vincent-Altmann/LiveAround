@@ -505,7 +505,7 @@ class _ProfileSummary extends StatelessWidget {
                   Text(
                     '${profile.favoritesCount} favoris',
                     style: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.6),
+                      color: Colors.black.withValues(alpha: 0.68),
                     ),
                   ),
                 ],

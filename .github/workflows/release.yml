@@ -1,0 +1,71 @@
+# Deploiement continu : declenche par un tag de version (v*).
+# 1. Rejoue les verifications de la CI (lint, build, tests).
+# 2. Construit et publie l'image Docker de l'API sur GitHub Container Registry.
+# 3. Construit l'APK Android et l'attache a la release GitHub.
+# Protocole complet : docs/deploiement-continu.md
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  verify-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  publish-api-image:
+    needs: verify-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Construire et publier l'image
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/livearound-api"
+          docker build -t "$IMAGE:$VERSION" -t "$IMAGE:latest" apps/api
+          docker push "$IMAGE:$VERSION"
+          docker push "$IMAGE:latest"
+
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - name: Construire l'APK
+        run: flutter build apk --release --dart-define LIVEAROUND_API_BASE_URL=${{ vars.LIVEAROUND_API_BASE_URL || 'http://10.0.2.2:3000' }}
+      - name: Attacher l'APK a la release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/mobile/build/app/outputs/flutter-apk/app-release.apk
+          generate_release_notes: true

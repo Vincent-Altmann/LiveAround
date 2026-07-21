@@ -1,0 +1,27 @@
+# Veille automatique des dependances : une passe hebdomadaire par
+# ecosysteme, regroupee en une PR par gestionnaire pour limiter le bruit.
+# Processus complet : docs/dependances.md
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /apps/api
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      api-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: pub
+    directory: /apps/mobile
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      mobile-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

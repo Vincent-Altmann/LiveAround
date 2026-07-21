@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'config/livearound_config.dart';
 import 'data/account_repository.dart';
@@ -85,6 +86,15 @@ class LiveAroundApp extends StatelessWidget {
     return MaterialApp(
       title: 'LiveAround',
       debugShowCheckedModeBanner: false,
+      // Accessibilite : les composants systeme (selecteur de dates,
+      // libelles des lecteurs d'ecran...) sont annonces en francais.
+      locale: const Locale('fr'),
+      supportedLocales: const [Locale('fr')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: LiveAroundTheme.light(),
       home: AuthGate(
         repository: repository,
