@@ -65,7 +65,7 @@ jobs:
       - name: Construire l'APK
         run: flutter build apk --release --dart-define LIVEAROUND_API_BASE_URL=${{ vars.LIVEAROUND_API_BASE_URL || 'http://10.0.2.2:3000' }}
       - name: Attacher l'APK a la release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: apps/mobile/build/app/outputs/flutter-apk/app-release.apk
           generate_release_notes: true
