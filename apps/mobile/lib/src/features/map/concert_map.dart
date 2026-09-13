@@ -58,8 +58,9 @@ class ConcertMap extends StatelessWidget {
           ),
           children: [
             TileLayer(
-              urlTemplate:
-                  'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+              // Tuiles OpenStreetMap standard : les tuiles CARTO exigent
+              // desormais une cle API (filigrane « API KEY REQUIRED »).
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.livearound.app',
             ),
             MarkerLayer(
@@ -93,7 +94,6 @@ class ConcertMap extends StatelessWidget {
               alignment: AttributionAlignment.bottomRight,
               attributions: [
                 TextSourceAttribution('OpenStreetMap contributors'),
-                TextSourceAttribution('CARTO'),
               ],
             ),
           ],
